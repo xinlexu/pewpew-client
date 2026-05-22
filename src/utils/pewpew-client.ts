@@ -27,7 +27,7 @@ export type PewPewProxyGroupResult = {
   options: PewPewProxyOption[]
 }
 
-const UNKNOWN_VALUE = '未提供'
+export const PEWPEW_UNKNOWN_STATUS = '未提供'
 
 const POLICY_TYPES = new Set(['Selector', 'URLTest', 'Fallback', 'LoadBalance'])
 
@@ -50,6 +50,17 @@ const BLOCKED_NAME_KEYWORDS = [
   '负载均衡',
   'SSONE',
   '订阅',
+  'remaining traffic',
+  'data remaining',
+  'remaining data',
+  'reset in',
+  'next reset',
+  'expires',
+  'expire date',
+  'expiration',
+  'official',
+  'navigation',
+  'subscription',
 ]
 
 const GROUP_PRIORITY: Array<{
@@ -160,7 +171,7 @@ export const resolvePewPewProxyGroup = (
 
 const formatBytes = (value?: number) => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    return UNKNOWN_VALUE
+    return PEWPEW_UNKNOWN_STATUS
   }
 
   const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
@@ -183,17 +194,23 @@ const parseStatusFromName = (
   name: string,
   current: Partial<PewPewSubscriptionStatus>,
 ) => {
-  const remaining = name.match(/剩余流量[:：]\s*(.+)/)
+  const remaining = name.match(
+    /(?:剩余流量|remaining traffic|data remaining|remaining data)(?:[:：]\s*|\s+)(.+)/i,
+  )
   if (remaining?.[1]) {
     current.remainingTraffic ||= cleanStatusValue(remaining[1])
   }
 
-  const nextReset = name.match(/距离下次重置剩余[:：]\s*(.+)/)
+  const nextReset = name.match(
+    /(?:距离下次重置剩余|reset in|next reset)(?:[:：]\s*|\s+)(.+)/i,
+  )
   if (nextReset?.[1]) {
     current.nextReset ||= cleanStatusValue(nextReset[1])
   }
 
-  const expire = name.match(/套餐到期[:：]\s*(.+)/)
+  const expire = name.match(
+    /(?:套餐到期|expires|expire date|expiration)(?:[:：]\s*|\s+)(.+)/i,
+  )
   if (expire?.[1]) {
     current.expire ||= cleanStatusValue(expire[1])
   }
@@ -243,8 +260,8 @@ export const extractPewPewSubscriptionStatus = (
   )
 
   return {
-    remainingTraffic: status.remainingTraffic || UNKNOWN_VALUE,
-    nextReset: status.nextReset || UNKNOWN_VALUE,
-    expire: status.expire || UNKNOWN_VALUE,
+    remainingTraffic: status.remainingTraffic || PEWPEW_UNKNOWN_STATUS,
+    nextReset: status.nextReset || PEWPEW_UNKNOWN_STATUS,
+    expire: status.expire || PEWPEW_UNKNOWN_STATUS,
   }
 }

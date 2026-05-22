@@ -45,6 +45,12 @@ tray:
   global: 글로벌
   profiles: 프로필
   proxies: 프록시
+  connect: Connect
+  disconnect: Disconnect
+  currentRoute: Current route
+  selectRoute: Select a route
+  updateRoutes: Update Routes
+  repairNetwork: Repair Network
   systemProxy: 시스템 프록시
   tunMode: TUN 모드
   closeAllConnections: 모든 연결 닫기

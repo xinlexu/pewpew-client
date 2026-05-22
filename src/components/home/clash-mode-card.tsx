@@ -1,5 +1,6 @@
 import { Box, Chip, Stack, Typography, alpha, useTheme } from '@mui/material'
 import { useLockFn } from 'ahooks'
+import { useTranslation } from 'react-i18next'
 import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
 import { useVerge } from '@/hooks/use-verge'
@@ -16,23 +17,27 @@ const VISIBLE_CLASH_MODES: ClashMode[] = ['rule', 'global']
 const isClashMode = (mode: string): mode is ClashMode =>
   (CLASH_MODES as readonly string[]).includes(mode)
 
-const MODE_META: Record<ClashMode, { label: string; description: string }> = {
+const MODE_META: Record<
+  ClashMode,
+  { labelKey: string; descriptionKey: string }
+> = {
   rule: {
-    label: '智能模式',
-    description: '按规则自动选择连接方式',
+    labelKey: 'home.pewpew.connection.smartMode',
+    descriptionKey: 'home.pewpew.connection.smartModeDescription',
   },
   global: {
-    label: '全局模式',
-    description: '统一通过当前线路连接',
+    labelKey: 'home.pewpew.connection.globalMode',
+    descriptionKey: 'home.pewpew.connection.globalModeDescription',
   },
   direct: {
-    label: '直连模式',
-    description: '直连模式',
+    labelKey: 'home.components.clashMode.labels.direct',
+    descriptionKey: 'home.components.clashMode.descriptions.direct',
   },
 }
 
 export const ClashModeCard = () => {
   const theme = useTheme()
+  const { i18n, t } = useTranslation()
   const { verge } = useVerge()
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
@@ -68,14 +73,14 @@ export const ClashModeCard = () => {
   // 按钮样式
   const buttonStyles = (mode: ClashMode) => ({
     cursor: 'pointer',
-    px: 1.5,
-    py: 1,
+    px: 1.35,
+    py: 1.15,
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'center',
-    gap: 0.45,
-    minHeight: 72,
+    gap: 0.6,
+    minHeight: 90,
     minWidth: 0,
     boxSizing: 'border-box',
     bgcolor:
@@ -89,7 +94,6 @@ export const ClashModeCard = () => {
         : alpha(theme.palette.primary.main, 0.08)
     }`,
     borderRadius: 3,
-    transition: 'all 0.2s ease-in-out',
     position: 'relative',
     overflow: 'hidden',
     '&:hover': {
@@ -119,25 +123,43 @@ export const ClashModeCard = () => {
           <Box
             key={mode}
             role="button"
+            aria-pressed={mode === visibleModeKey}
             tabIndex={0}
             onClick={() => onChangeMode(mode)}
             sx={buttonStyles(mode)}
           >
-            <Stack
-              direction="row"
-              spacing={0.75}
-              sx={{ alignItems: 'center', minWidth: 0 }}
+            <Box
+              sx={{
+                minWidth: 0,
+                pr: mode === 'rule' ? 5.5 : 0,
+                textAlign: 'left',
+              }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 850 }} noWrap>
-                {MODE_META[mode].label}
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 900,
+                  lineHeight: 1.2,
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                {t(MODE_META[mode].labelKey)}
               </Typography>
               {mode === 'rule' && (
                 <Chip
                   size="small"
-                  label="推荐"
+                  label={
+                    i18n.language === 'en'
+                      ? t('home.pewpew.connection.recommendedShort')
+                      : t('home.pewpew.connection.recommended')
+                  }
                   sx={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
                     height: 20,
                     fontSize: 11,
+                    maxWidth: 64,
                     bgcolor:
                       mode === visibleModeKey
                         ? alpha(theme.palette.common.white, 0.18)
@@ -146,19 +168,25 @@ export const ClashModeCard = () => {
                       mode === visibleModeKey
                         ? 'inherit'
                         : theme.palette.success.main,
+                    '& .MuiChip-label': {
+                      px: 0.75,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    },
                   }}
                 />
               )}
-            </Stack>
+            </Box>
             <Typography
               variant="caption"
               sx={{
                 opacity: mode === visibleModeKey ? 0.9 : 0.72,
-                textAlign: 'center',
-                lineHeight: 1.3,
+                textAlign: 'left',
+                lineHeight: 1.32,
+                overflowWrap: 'anywhere',
               }}
             >
-              {MODE_META[mode].description}
+              {t(MODE_META[mode].descriptionKey)}
             </Typography>
           </Box>
         ))}

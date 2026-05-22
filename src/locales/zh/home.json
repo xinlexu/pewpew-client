@@ -131,5 +131,126 @@
         "direct": "所有流量不经过代理节点，但经过 Clash 内核转发连接目标服务器，适用于需要通过内核进行分流的特定场景"
       }
     }
+  },
+  "pewpew": {
+    "header": {
+      "title": "PewPew 云客户端",
+      "subtitle": "选择线路后，点击连接即可使用",
+      "wechat": "微信 PewPew_VPN",
+      "about": "关于",
+      "preferences": "偏好设置"
+    },
+    "switch": {
+      "currentRouteEmpty": "当前线路：请选择线路",
+      "currentRoute": "当前线路：{{name}}",
+      "currentRouteWithDelay": "当前线路：{{name}} · {{delay}}"
+    },
+    "account": {
+      "title": "账户信息",
+      "remainingTraffic": "剩余流量",
+      "nextReset": "下次重置",
+      "expire": "套餐到期",
+      "unavailable": "未提供",
+      "expiringSoon": "套餐即将到期，请及时续费",
+      "expired": "套餐已到期，请续费后使用",
+      "lowData": "剩余流量较低，请留意使用",
+      "dataExhausted": "流量已用尽，请续费后使用"
+    },
+    "connectionStatus": {
+      "title": "连接状态",
+      "disconnected": "未连接",
+      "connected": "已连接",
+      "connecting": "连接中...",
+      "disconnecting": "断开中...",
+      "failed": "连接失败",
+      "connect": "连接",
+      "disconnect": "断开连接",
+      "reconnect": "重新连接",
+      "connectFailed": "连接失败，可重试或恢复网络",
+      "disconnectFailed": "断开连接失败，请稍后重试",
+      "repairNetwork": "恢复网络",
+      "repairSuccess": "网络已恢复，请重新连接",
+      "repairFailed": "恢复失败，请联系客服"
+    },
+    "connection": {
+      "title": "连接设置",
+      "route": "线路",
+      "mode": "模式",
+      "selectRoute": "选择线路",
+      "importFirst": "当前没有可用线路，请先导入线路",
+      "smartMode": "智能模式",
+      "recommended": "推荐",
+      "recommendedShort": "推荐",
+      "smartModeDescription": "自动选择合适的连接方式",
+      "globalMode": "全局模式",
+      "globalModeDescription": "所有连接使用当前线路",
+      "routeChangeFailed": "线路切换失败，请稍后重试或联系客服"
+    },
+    "delay": {
+      "testing": "测试中",
+      "unavailable": "不可用",
+      "unit": "ms",
+      "refresh": "测试线路延迟"
+    },
+    "subscription": {
+      "title": "线路订阅",
+      "description": "粘贴链接后导入或更新线路",
+      "placeholder": "粘贴订阅链接",
+      "import": "导入线路",
+      "update": "更新线路",
+      "lastUpdated": "上次更新时间",
+      "pasteFirst": "请先粘贴订阅链接",
+      "notImported": "尚未导入线路",
+      "imported": "当前状态：线路订阅已导入",
+      "invalidUrl": "订阅链接需要以 http:// 或 https:// 开头",
+      "importing": "正在导入线路...",
+      "updating": "正在更新线路...",
+      "importSuccess": "线路导入成功，请点击“连接”开始使用",
+      "updateSuccess": "线路更新成功，请点击“连接”开始使用",
+      "importFailed": "线路导入失败，请检查订阅链接或联系客服",
+      "updateFailed": "线路更新失败，请检查订阅链接或联系客服",
+      "temporarilyStopped": "已临时断开连接，正在更新线路",
+      "autoUpdateFailed": "线路自动更新失败，可手动更新"
+    },
+    "onboarding": {
+      "title": "开始使用 PewPew 云",
+      "stepPaste": "粘贴订阅链接",
+      "stepImport": "导入线路",
+      "stepConnect": "选择线路并连接",
+      "importRoutes": "去导入线路"
+    },
+    "diagnostics": {
+      "copy": "复制诊断信息",
+      "copySuccess": "诊断信息已复制，请发送给客服",
+      "copyFailed": "复制失败，请稍后重试"
+    },
+    "preferences": {
+      "title": "偏好设置",
+      "appearance": "外观",
+      "followSystem": "跟随系统",
+      "light": "浅色模式",
+      "dark": "深色模式",
+      "language": "语言",
+      "simplifiedChinese": "简体中文",
+      "english": "English",
+      "startup": "启动",
+      "autoLaunch": "开机自动启动客户端",
+      "silentStart": "启动后最小化到托盘",
+      "autoUpdateRoutesOnStartup": "启动时自动更新线路",
+      "autoStartPewPew": "启动后自动连接",
+      "safety": "安全",
+      "autoCloseOnQuit": "退出软件时断开连接",
+      "saveFailed": "设置保存失败，请稍后重试"
+    },
+    "about": {
+      "title": "关于 / 开源许可",
+      "clientName": "PewPew 云客户端",
+      "description": "PewPew 云客户端基于 Clash Verge Rev、mihomo / Clash.Meta、Tauri 构建。",
+      "license": "本客户端遵守 GPL-3.0 开源许可。",
+      "licenseTitle": "开源许可",
+      "credits": "上游致谢",
+      "support": "客服微信：PewPew_VPN",
+      "close": "关闭"
+    }
   }
 }

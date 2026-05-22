@@ -45,6 +45,12 @@ tray:
   global: グローバル
   profiles: プロファイル
   proxies: プロキシ
+  connect: Connect
+  disconnect: Disconnect
+  currentRoute: Current route
+  selectRoute: Select a route
+  updateRoutes: Update Routes
+  repairNetwork: Repair Network
   systemProxy: システムプロキシ
   tunMode: TUN モード
   closeAllConnections: すべての接続を閉じる

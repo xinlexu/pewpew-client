@@ -3,7 +3,10 @@ node_modules
 .DS_Store
 dist
 dist-ssr
+build
 *.local
+.env
+.env.*
 update.json
 scripts/_env.sh
 .vscode
@@ -18,3 +21,15 @@ CLAUDE.md
 .vfox/
 .claude
 AGENTS.md
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+*.provisioningprofile
+*.cer
+*.crt
+*.csr
+README 2.md
+* 2.tsx

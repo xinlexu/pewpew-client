@@ -35,7 +35,7 @@ service:
   adminInstallPrompt: Installing the Clash Verge service requires administrator privileges.
   adminUninstallPrompt: Uninstalling the Clash Verge service requires administrator privileges.
 tray:
-  dashboard: Dashboard
+  dashboard: Open PewPew Cloud Client
   ruleMode: Rule Mode
   globalMode: Global Mode
   directMode: Direct Mode
@@ -45,6 +45,12 @@ tray:
   global: Global
   profiles: Profiles
   proxies: Proxies
+  connect: Connect
+  disconnect: Disconnect
+  currentRoute: Current route
+  selectRoute: Select a route
+  updateRoutes: Update Routes
+  repairNetwork: Repair Network
   systemProxy: System Proxy
   tunMode: TUN Mode
   closeAllConnections: Close All Connections

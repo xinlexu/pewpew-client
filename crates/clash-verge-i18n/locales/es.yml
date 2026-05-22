@@ -45,6 +45,12 @@ tray:
   global: Global
   profiles: Perfiles
   proxies: Proxies
+  connect: Connect
+  disconnect: Disconnect
+  currentRoute: Current route
+  selectRoute: Select a route
+  updateRoutes: Update Routes
+  repairNetwork: Repair Network
   systemProxy: Proxy del sistema
   tunMode: Modo TUN
   closeAllConnections: Cerrar todas las conexiones

@@ -131,5 +131,126 @@
         "direct": "프록시를 우회하여 직접 인터넷에 연결합니다."
       }
     }
+  },
+  "pewpew": {
+    "header": {
+      "title": "PewPew Cloud Client",
+      "subtitle": "Choose a route, then connect",
+      "wechat": "WeChat PewPew_VPN",
+      "about": "About",
+      "preferences": "Preferences"
+    },
+    "switch": {
+      "currentRouteEmpty": "Current route: Select a route",
+      "currentRoute": "Current route: {{name}}",
+      "currentRouteWithDelay": "Current route: {{name}} · {{delay}}"
+    },
+    "account": {
+      "title": "Account",
+      "remainingTraffic": "Data remaining",
+      "nextReset": "Next reset",
+      "expire": "Expires",
+      "unavailable": "Not available",
+      "expiringSoon": "Your plan expires soon. Please renew.",
+      "expired": "Your plan has expired. Please renew to continue.",
+      "lowData": "Data is running low.",
+      "dataExhausted": "Data is used up. Please renew."
+    },
+    "connectionStatus": {
+      "title": "Connection Status",
+      "disconnected": "Disconnected",
+      "connected": "Connected",
+      "connecting": "Connecting...",
+      "disconnecting": "Disconnecting...",
+      "failed": "Connection failed",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "reconnect": "Reconnect",
+      "connectFailed": "Connection failed. Retry or repair the network.",
+      "disconnectFailed": "Disconnect failed. Please try again.",
+      "repairNetwork": "Repair Network",
+      "repairSuccess": "Network restored. Please reconnect.",
+      "repairFailed": "Repair failed. Please contact support."
+    },
+    "connection": {
+      "title": "Connection",
+      "route": "Route",
+      "mode": "Mode",
+      "selectRoute": "Select a route",
+      "importFirst": "No available route. Import routes first.",
+      "smartMode": "Smart Mode",
+      "recommended": "Recommended",
+      "recommendedShort": "Rec.",
+      "smartModeDescription": "Automatically selects the right connection",
+      "globalMode": "Global Mode",
+      "globalModeDescription": "Uses the selected route for all connections",
+      "routeChangeFailed": "Route change failed. Please try again or contact support."
+    },
+    "delay": {
+      "testing": "Testing",
+      "unavailable": "Unavailable",
+      "unit": "ms",
+      "refresh": "Test route latency"
+    },
+    "subscription": {
+      "title": "Route Subscription",
+      "description": "Paste a link to import or update routes",
+      "placeholder": "Paste subscription link",
+      "import": "Import Routes",
+      "update": "Update Routes",
+      "lastUpdated": "Last updated",
+      "pasteFirst": "Please paste a subscription link first",
+      "notImported": "No routes imported yet",
+      "imported": "Route subscription imported",
+      "invalidUrl": "The subscription link must start with http:// or https://",
+      "importing": "Importing routes...",
+      "updating": "Updating routes...",
+      "importSuccess": "Routes imported. Click “Connect” to start.",
+      "updateSuccess": "Routes updated. Click “Connect” to start.",
+      "importFailed": "Import failed. Check the subscription link or contact support.",
+      "updateFailed": "Update failed. Check the subscription link or contact support.",
+      "temporarilyStopped": "Temporarily disconnected. Updating routes.",
+      "autoUpdateFailed": "Auto update failed. You can update manually."
+    },
+    "onboarding": {
+      "title": "Get started with PewPew Cloud",
+      "stepPaste": "Paste your subscription link",
+      "stepImport": "Import routes",
+      "stepConnect": "Select a route and connect",
+      "importRoutes": "Import routes"
+    },
+    "diagnostics": {
+      "copy": "Copy Diagnostics",
+      "copySuccess": "Diagnostics copied. Send it to support.",
+      "copyFailed": "Copy failed. Please try again."
+    },
+    "preferences": {
+      "title": "Preferences",
+      "appearance": "Appearance",
+      "followSystem": "Follow system",
+      "light": "Light",
+      "dark": "Dark",
+      "language": "Language",
+      "simplifiedChinese": "Simplified Chinese",
+      "english": "English",
+      "startup": "Startup",
+      "autoLaunch": "Start the client at login",
+      "silentStart": "Start minimized to tray",
+      "autoUpdateRoutesOnStartup": "Update routes on startup",
+      "autoStartPewPew": "Connect automatically after startup",
+      "safety": "Safety",
+      "autoCloseOnQuit": "Disconnect when quitting",
+      "saveFailed": "Failed to save settings. Please try again."
+    },
+    "about": {
+      "title": "About / Open Source Licenses",
+      "clientName": "PewPew Cloud Client",
+      "description": "PewPew Cloud Client is built on Clash Verge Rev, mihomo / Clash.Meta, and Tauri.",
+      "license": "This client follows the GPL-3.0 open source license.",
+      "licenseTitle": "Open Source License",
+      "credits": "Credits",
+      "support": "WeChat: PewPew_VPN",
+      "close": "Close"
+    }
   }
 }

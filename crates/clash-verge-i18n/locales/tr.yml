@@ -45,6 +45,12 @@ tray:
   global: Küresel
   profiles: Profiller
   proxies: Vekil'ler
+  connect: Connect
+  disconnect: Disconnect
+  currentRoute: Current route
+  selectRoute: Select a route
+  updateRoutes: Update Routes
+  repairNetwork: Repair Network
   systemProxy: Sistem Vekil'i
   tunMode: TUN Modu
   closeAllConnections: Tüm Bağlantıları Kapat
