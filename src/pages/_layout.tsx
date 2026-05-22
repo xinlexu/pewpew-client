@@ -37,6 +37,11 @@ import { WindowControls } from '@/components/layout/window-controller'
 import { useI18n } from '@/hooks/use-i18n'
 import { useVerge } from '@/hooks/use-verge'
 import { useWindowDecorations } from '@/hooks/use-window'
+import {
+  getCachedClientLanguageMode,
+  resolveClientLanguage,
+  resolveClientLanguageMode,
+} from '@/services/i18n'
 import { useThemeMode } from '@/services/states'
 import getSystem from '@/utils/get-system'
 
@@ -229,10 +234,13 @@ const Layout = () => {
   useLayoutEvents(handleNotice)
 
   useEffect(() => {
-    if (language) {
-      dayjs.locale(language === 'zh' ? 'zh-cn' : language)
-      switchLanguage(language)
-    }
+    const cachedLanguageMode = getCachedClientLanguageMode()
+    const targetLanguage = cachedLanguageMode
+      ? resolveClientLanguageMode(cachedLanguageMode)
+      : resolveClientLanguage(language)
+
+    dayjs.locale(targetLanguage === 'zh' ? 'zh-cn' : 'en')
+    switchLanguage(targetLanguage)
   }, [language, switchLanguage])
 
   if (!themeReady) {

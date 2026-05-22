@@ -45,6 +45,12 @@ tray:
   global: سراسری
   profiles: پروفایل‌ها
   proxies: پروکسی‌ها
+  connect: Connect
+  disconnect: Disconnect
+  currentRoute: Current route
+  selectRoute: Select a route
+  updateRoutes: Update Routes
+  repairNetwork: Repair Network
   systemProxy: پروکسی سیستم
   tunMode: حالت TUN
   closeAllConnections: بستن همه اتصال‌ها

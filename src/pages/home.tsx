@@ -1,8 +1,11 @@
 import {
+  BuildRounded,
   CloseRounded,
+  ContentCopyRounded,
   EventAvailableRounded,
   InfoOutlined,
   RestartAltRounded,
+  SettingsRounded,
   TravelExploreRounded,
 } from '@mui/icons-material'
 import {
@@ -10,30 +13,57 @@ import {
   Box,
   Button,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
-  Grid,
   IconButton,
   Link,
   Paper,
   Stack,
+  Switch,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
   alpha,
   useTheme,
 } from '@mui/material'
+import type { Theme } from '@mui/material/styles'
+import { getVersion } from '@tauri-apps/api/app'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import dayjs from 'dayjs'
-import { useCallback, useReducer, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
+import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import pewpewLogo from '@/assets/pewpew-logo.jpg'
 import { ClashModeCard } from '@/components/home/clash-mode-card'
 import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
+import { useI18n } from '@/hooks/use-i18n'
 import { useProfiles } from '@/hooks/use-profiles'
-import { useProxiesData } from '@/providers/app-data-context'
-import delayManager from '@/services/delay'
+import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
+import { useVerge } from '@/hooks/use-verge'
 import {
+  useAppRefreshers,
+  useClashConfigData,
+  useProxiesData,
+} from '@/providers/app-data-context'
+import { enhanceProfiles, updateProfile } from '@/services/cmds'
+import delayManager from '@/services/delay'
+import type { ClientLanguageMode } from '@/services/i18n'
+import { getCachedClientLanguageMode } from '@/services/i18n'
+import { showNotice } from '@/services/notice-service'
+import {
+  PEWPEW_UNKNOWN_STATUS,
   PewPewSubscriptionStatus,
   extractPewPewSubscriptionStatus,
   resolvePewPewProxyGroup,
@@ -41,23 +71,58 @@ import {
 
 const PEWPEW_BLUE = '#2869df'
 const WECHAT_GREEN = '#07c160'
+const AUTO_UPDATE_ROUTES_ON_STARTUP_KEY = 'pewpew-auto-update-routes-on-startup'
+
+const readAutoUpdateRoutesOnStartup = () =>
+  localStorage.getItem(AUTO_UPDATE_ROUTES_ON_STARTUP_KEY) !== 'false'
+
+const writeAutoUpdateRoutesOnStartup = (enabled: boolean) => {
+  localStorage.setItem(AUTO_UPDATE_ROUTES_ON_STARTUP_KEY, String(enabled))
+}
+
+const getReadableError = (error: unknown) => {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return ''
+}
 
 const HomePage = () => {
   const theme = useTheme()
+  const { i18n, t } = useTranslation()
   const { current, mutateProfiles } = useProfiles()
   const { proxies } = useProxiesData()
+  const { refreshAll } = useAppRefreshers()
+  const { clashConfig } = useClashConfigData()
+  const { verge } = useVerge()
+  const {
+    indicator: connectionEnabled,
+    setSystemProxyEnabled,
+    invalidateProxyState,
+  } = useSystemProxyState()
   const [lineSyncing, setLineSyncing] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [preferencesOpen, setPreferencesOpen] = useState(false)
+  const [repairingNetwork, setRepairingNetwork] = useState(false)
+  const [lastConnectionError, setLastConnectionError] = useState('')
+  const [autoUpdateRoutesOnStartup, setAutoUpdateRoutesOnStartup] = useState(
+    readAutoUpdateRoutesOnStartup,
+  )
   const [, refreshDelaySummary] = useReducer((value: number) => value + 1, 0)
+  const subscriptionCardRef = useRef<HTMLDivElement | null>(null)
+  const startupUpdateRanRef = useRef(false)
   const subscriptionStatus = extractPewPewSubscriptionStatus(current, proxies)
   const isDark = theme.palette.mode === 'dark'
+  const proxyGroupResult = useMemo(
+    () => resolvePewPewProxyGroup(proxies),
+    [proxies],
+  )
 
   const currentLineSummary = (() => {
-    const { group, options } = resolvePewPewProxyGroup(proxies)
-    if (!group?.now) return { name: '请选择线路', delayText: '' }
+    const { group, options } = proxyGroupResult
+    if (!group?.now) return { name: '', delayText: '' }
 
     const currentLine = options.find((item) => item.name === group.now)
-    if (!currentLine) return { name: '请选择线路', delayText: '' }
+    if (!currentLine) return { name: '', delayText: '' }
 
     const cachedDelay = delayManager.getDelayUpdate(
       currentLine.name,
@@ -68,33 +133,204 @@ const HomePage = () => {
         ? cachedDelay.delay
         : delayManager.getDelayFix(currentLine.record, group.name)
     const delayText =
-      delay > 0 && delay < 10000 ? `${delayManager.formatDelay(delay)} ms` : ''
+      delay > 0 && delay < 10000
+        ? `${delayManager.formatDelay(delay)} ${t('home.pewpew.delay.unit')}`
+        : ''
 
     return { name: currentLine.name, delayText }
   })()
+  const hasUsableRoutes = proxyGroupResult.options.length > 0
 
   const handleDelayUpdated = useCallback(() => {
     refreshDelaySummary()
   }, [])
 
+  const handleRepairNetwork = useCallback(async () => {
+    setRepairingNetwork(true)
+
+    try {
+      await setSystemProxyEnabled(false)
+      await invalidateProxyState()
+      setLastConnectionError('')
+      showNotice.success(t('home.pewpew.connectionStatus.repairSuccess'))
+    } catch (error) {
+      console.error('[PewPew] 恢复网络失败:', error)
+      setLastConnectionError(getReadableError(error))
+      showNotice.error(t('home.pewpew.connectionStatus.repairFailed'))
+      throw error
+    } finally {
+      setRepairingNetwork(false)
+    }
+  }, [invalidateProxyState, setSystemProxyEnabled, t])
+
+  const handleCopyDiagnostics = useCallback(async () => {
+    try {
+      const appVersion = await getVersion().catch(() => 'unknown')
+      const hasSubscriptionStatus = Object.values(subscriptionStatus).some(
+        (value) => value !== PEWPEW_UNKNOWN_STATUS,
+      )
+      const diagnostics = [
+        'PewPew Cloud Client Diagnostics',
+        `Version: ${appVersion}`,
+        `OS: ${navigator.platform || 'unknown'} (${navigator.userAgent || 'unknown'})`,
+        `Language: ${i18n.language || 'unknown'}`,
+        `Theme: ${verge?.theme_mode ?? theme.palette.mode}`,
+        `Connection: ${connectionEnabled ? 'connected' : 'disconnected'}`,
+        `Current route: ${currentLineSummary.name || 'not selected'}`,
+        `Mode: ${clashConfig?.mode || 'unknown'}`,
+        `Last route update: ${
+          current?.updated
+            ? dayjs(current.updated * 1000).format('YYYY-MM-DD HH:mm:ss')
+            : 'never'
+        }`,
+        `Last connection error: ${lastConnectionError || 'none'}`,
+        `Has usable routes: ${hasUsableRoutes ? 'yes' : 'no'}`,
+        `Has subscription status: ${hasSubscriptionStatus ? 'yes' : 'no'}`,
+        `Generated at: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+      ].join('\n')
+
+      try {
+        await writeText(diagnostics)
+      } catch {
+        await navigator.clipboard.writeText(diagnostics)
+      }
+
+      showNotice.success(t('home.pewpew.diagnostics.copySuccess'))
+    } catch (error) {
+      console.error('[PewPew] 复制诊断信息失败:', error)
+      showNotice.error(t('home.pewpew.diagnostics.copyFailed'))
+    }
+  }, [
+    clashConfig?.mode,
+    connectionEnabled,
+    current?.updated,
+    currentLineSummary.name,
+    hasUsableRoutes,
+    i18n.language,
+    lastConnectionError,
+    subscriptionStatus,
+    t,
+    theme.palette.mode,
+    verge?.theme_mode,
+  ])
+
+  const handleAutoUpdateRoutesOnStartupChange = useCallback(
+    (enabled: boolean) => {
+      writeAutoUpdateRoutesOnStartup(enabled)
+      setAutoUpdateRoutesOnStartup(enabled)
+    },
+    [],
+  )
+
+  const handleImportGuide = useCallback(() => {
+    subscriptionCardRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    })
+  }, [])
+
+  useEffect(() => {
+    if (startupUpdateRanRef.current) return
+    if (!autoUpdateRoutesOnStartup || !current?.uid) return
+    if (connectionEnabled || lineSyncing) {
+      startupUpdateRanRef.current = true
+      return
+    }
+
+    startupUpdateRanRef.current = true
+    queueMicrotask(() => setLineSyncing(true))
+
+    void (async () => {
+      try {
+        await updateProfile(current.uid, current.option)
+        const enhanced = await enhanceProfiles()
+        if (!enhanced) throw new Error('route enhancement failed')
+        await mutateProfiles()
+        await refreshAll()
+      } catch (error) {
+        console.error('[PewPew] 启动时自动更新线路失败:', error)
+        showNotice.info(t('home.pewpew.subscription.autoUpdateFailed'))
+      } finally {
+        setLineSyncing(false)
+      }
+    })()
+  }, [
+    autoUpdateRoutesOnStartup,
+    connectionEnabled,
+    current?.option,
+    current?.uid,
+    lineSyncing,
+    mutateProfiles,
+    refreshAll,
+    t,
+  ])
+
   return (
     <Box
+      className="pewpew-shell"
+      data-pewpew-theme={isDark ? 'dark' : 'light'}
       sx={{
+        '--pewpew-bg': isDark ? '#151922' : '#f4f7fb',
+        '--pewpew-panel': isDark
+          ? alpha(theme.palette.background.paper, 0.9)
+          : alpha(theme.palette.common.white, 0.92),
+        '--pewpew-panel-soft': isDark
+          ? alpha(theme.palette.background.paper, 0.84)
+          : alpha(theme.palette.common.white, 0.84),
+        '--pewpew-panel-muted': isDark
+          ? alpha(theme.palette.background.paper, 0.78)
+          : alpha(theme.palette.common.white, 0.72),
+        '--pewpew-border': alpha(PEWPEW_BLUE, isDark ? 0.14 : 0.08),
+        '--pewpew-primary-soft': alpha(PEWPEW_BLUE, isDark ? 0.16 : 0.075),
+        '--pewpew-input-bg': isDark
+          ? alpha(theme.palette.background.paper, 0.72)
+          : alpha(theme.palette.common.white, 0.92),
+        position: 'relative',
+        isolation: 'isolate',
         height: '100%',
         minHeight: '100%',
         overflow: 'auto',
+        overflowX: 'hidden',
         boxSizing: 'border-box',
         px: { xs: 2, md: 3 },
         py: { xs: 1.5, md: 2 },
-        bgcolor: isDark ? '#151922' : '#f4f7fb',
-        background: isDark
-          ? 'radial-gradient(circle at 50% -10%, rgba(40,105,223,0.22), transparent 32%), linear-gradient(145deg, #151922 0%, #1d2430 52%, #171b24 100%)'
-          : 'radial-gradient(circle at 50% -12%, rgba(40,105,223,0.16), transparent 34%), linear-gradient(145deg, #f4f7fb 0%, #eef5fb 48%, #f8fafc 100%)',
+        bgcolor: 'var(--pewpew-bg)',
+        '&::before, &::after': {
+          content: '""',
+          position: 'fixed',
+          inset: 0,
+          pointerEvents: 'none',
+          transition: 'opacity 320ms ease',
+        },
+        '&::before': {
+          zIndex: -2,
+          opacity: isDark ? 0 : 1,
+          background:
+            'radial-gradient(circle at 50% -12%, rgba(40,105,223,0.16), transparent 34%), linear-gradient(145deg, #f4f7fb 0%, #eef5fb 48%, #f8fafc 100%)',
+        },
+        '&::after': {
+          zIndex: -1,
+          opacity: isDark ? 1 : 0,
+          background:
+            'radial-gradient(circle at 50% -10%, rgba(40,105,223,0.22), transparent 32%), linear-gradient(145deg, #151922 0%, #1d2430 52%, #171b24 100%)',
+        },
+        '&, & .pewpew-transition': {
+          transition:
+            'background-color 280ms ease, color 240ms ease, border-color 280ms ease, box-shadow 280ms ease, opacity 240ms ease',
+        },
+        '@media (prefers-reduced-motion: reduce)': {
+          '&, & .pewpew-transition, &::before, &::after': {
+            transition: 'none !important',
+          },
+        },
       }}
     >
       <Stack
+        className="pewpew-content"
         spacing={2}
         sx={{
+          position: 'relative',
+          zIndex: 1,
           width: '100%',
           maxWidth: 1080,
           mx: 'auto',
@@ -102,29 +338,66 @@ const HomePage = () => {
           boxSizing: 'border-box',
         }}
       >
-        <PewPewHeader onAbout={() => setAboutOpen(true)} />
+        <PewPewHeader
+          onAbout={() => setAboutOpen(true)}
+          onPreferences={() => setPreferencesOpen(true)}
+        />
 
         <MainConnectPanel
           currentLine={currentLineSummary}
           disabled={lineSyncing}
+          hasRoute={hasUsableRoutes}
+          onConnectionError={setLastConnectionError}
+          onCopyDiagnostics={handleCopyDiagnostics}
+          onRepairNetwork={handleRepairNetwork}
+          repairing={repairingNetwork}
           status={subscriptionStatus}
         />
 
+        {!hasUsableRoutes && (
+          <GettingStartedCard onImportRoutes={handleImportGuide} />
+        )}
+
         <ConnectionSettingsCard onDelayUpdated={handleDelayUpdated} />
 
-        <HomeProfileCard
-          current={current}
-          onProfileUpdated={mutateProfiles}
-          onSyncingChange={setLineSyncing}
-        />
+        <Box ref={subscriptionCardRef}>
+          <HomeProfileCard
+            current={current}
+            onProfileUpdated={mutateProfiles}
+            onSyncingChange={setLineSyncing}
+          />
+        </Box>
       </Stack>
 
-      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <AboutDialog
+        open={aboutOpen}
+        onClose={() => setAboutOpen(false)}
+        onCopyDiagnostics={handleCopyDiagnostics}
+      />
+      <PreferencesDialog
+        autoUpdateRoutesOnStartup={autoUpdateRoutesOnStartup}
+        open={preferencesOpen}
+        onClose={() => setPreferencesOpen(false)}
+        onAutoUpdateRoutesOnStartupChange={
+          handleAutoUpdateRoutesOnStartupChange
+        }
+        onCopyDiagnostics={handleCopyDiagnostics}
+        onRepairNetwork={handleRepairNetwork}
+        repairingNetwork={repairingNetwork}
+      />
     </Box>
   )
 }
 
-const PewPewHeader = ({ onAbout }: { onAbout: () => void }) => {
+const PewPewHeader = ({
+  onAbout,
+  onPreferences,
+}: {
+  onAbout: () => void
+  onPreferences: () => void
+}) => {
+  const { t } = useTranslation()
+
   return (
     <Box
       component="header"
@@ -167,14 +440,14 @@ const PewPewHeader = ({ onAbout }: { onAbout: () => void }) => {
               fontSize: { xs: 20, sm: 24 },
             }}
           >
-            PewPew 云客户端
+            {t('home.pewpew.header.title')}
           </Typography>
           <Typography
             variant="body2"
             color="text.secondary"
             sx={{ mt: 0.35, fontWeight: 600 }}
           >
-            选择线路后，点击开启即可使用
+            {t('home.pewpew.header.subtitle')}
           </Typography>
         </Box>
       </Stack>
@@ -223,9 +496,20 @@ const PewPewHeader = ({ onAbout }: { onAbout: () => void }) => {
             <WeChatIcon />
           </Box>
           <Typography variant="body2" sx={{ fontWeight: 800 }}>
-            微信 PewPew_VPN
+            {t('home.pewpew.header.wechat')}
           </Typography>
         </Stack>
+
+        <Button
+          size="small"
+          variant="text"
+          color="inherit"
+          startIcon={<SettingsRounded />}
+          onClick={onPreferences}
+          sx={{ borderRadius: 999, px: 1.15, fontWeight: 700 }}
+        >
+          {t('home.pewpew.header.preferences')}
+        </Button>
 
         <Button
           size="small"
@@ -235,7 +519,7 @@ const PewPewHeader = ({ onAbout }: { onAbout: () => void }) => {
           onClick={onAbout}
           sx={{ borderRadius: 999, px: 1.15, fontWeight: 700 }}
         >
-          关于
+          {t('home.pewpew.header.about')}
         </Button>
       </Stack>
     </Box>
@@ -279,14 +563,25 @@ const WeChatIcon = () => {
 const MainConnectPanel = ({
   currentLine,
   disabled,
+  hasRoute,
+  onConnectionError,
+  onCopyDiagnostics,
+  onRepairNetwork,
+  repairing,
   status,
 }: {
   currentLine: { name: string; delayText: string }
   disabled: boolean
+  hasRoute: boolean
+  onConnectionError: (message: string) => void
+  onCopyDiagnostics: () => Promise<void>
+  onRepairNetwork: () => Promise<void>
+  repairing: boolean
   status: PewPewSubscriptionStatus
 }) => {
   return (
     <Paper
+      className="pewpew-transition"
       elevation={0}
       sx={(theme) => ({
         borderRadius: 5,
@@ -294,10 +589,7 @@ const MainConnectPanel = ({
         py: { xs: 2.25, md: 3 },
         boxSizing: 'border-box',
         overflow: 'hidden',
-        bgcolor:
-          theme.palette.mode === 'light'
-            ? alpha(theme.palette.common.white, 0.92)
-            : alpha(theme.palette.background.paper, 0.9),
+        bgcolor: 'var(--pewpew-panel)',
         border: `1px solid ${alpha(PEWPEW_BLUE, 0.1)}`,
         boxShadow:
           theme.palette.mode === 'light'
@@ -307,7 +599,14 @@ const MainConnectPanel = ({
     >
       <Stack spacing={2} sx={{ alignItems: 'center', minWidth: 0 }}>
         <Box sx={{ width: '100%', maxWidth: 440 }}>
-          <ProxyTunCard disabled={disabled} />
+          <ProxyTunCard
+            disabled={disabled}
+            hasRoute={hasRoute}
+            onConnectionError={onConnectionError}
+            onCopyDiagnostics={onCopyDiagnostics}
+            onRepairNetwork={onRepairNetwork}
+            repairing={repairing}
+          />
         </Box>
 
         <LineSummaryChip currentLine={currentLine} />
@@ -323,9 +622,15 @@ const LineSummaryChip = ({
 }: {
   currentLine: { name: string; delayText: string }
 }) => {
-  const text = currentLine.delayText
-    ? `当前线路：${currentLine.name} · ${currentLine.delayText}`
-    : `当前线路：${currentLine.name}`
+  const { t } = useTranslation()
+  const text = !currentLine.name
+    ? t('home.pewpew.switch.currentRouteEmpty')
+    : currentLine.delayText
+      ? t('home.pewpew.switch.currentRouteWithDelay', {
+          name: currentLine.name,
+          delay: currentLine.delayText,
+        })
+      : t('home.pewpew.switch.currentRoute', { name: currentLine.name })
 
   return (
     <Box
@@ -365,11 +670,58 @@ const getExpireAlert = (value: string) => {
   const expireEnd = expireDate.endOf('day')
 
   if (expireEnd.isBefore(today)) {
-    return { severity: 'error' as const, text: '套餐已到期，请续费后使用' }
+    return { severity: 'error' as const, key: 'home.pewpew.account.expired' }
   }
 
   if (expireDate.startOf('day').diff(today, 'day') <= 7) {
-    return { severity: 'warning' as const, text: '套餐即将到期，请及时续费' }
+    return {
+      severity: 'warning' as const,
+      key: 'home.pewpew.account.expiringSoon',
+    }
+  }
+
+  return null
+}
+
+const parseTrafficToGb = (value: string) => {
+  if (!value || value === PEWPEW_UNKNOWN_STATUS) return null
+  const match = value
+    .replace(/,/g, '')
+    .match(/(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB|PB)?/i)
+  if (!match) return null
+
+  const amount = Number(match[1])
+  if (!Number.isFinite(amount)) return null
+
+  const unit = (match[2] || 'GB').toUpperCase()
+  const unitToGb: Record<string, number> = {
+    B: 1 / 1024 / 1024 / 1024,
+    KB: 1 / 1024 / 1024,
+    MB: 1 / 1024,
+    GB: 1,
+    TB: 1024,
+    PB: 1024 * 1024,
+  }
+
+  return amount * (unitToGb[unit] ?? 1)
+}
+
+const getTrafficAlert = (value: string) => {
+  const gb = parseTrafficToGb(value)
+  if (gb === null) return null
+
+  if (gb <= 0) {
+    return {
+      severity: 'error' as const,
+      key: 'home.pewpew.account.dataExhausted',
+    }
+  }
+
+  if (gb < 2) {
+    return {
+      severity: 'warning' as const,
+      key: 'home.pewpew.account.lowData',
+    }
   }
 
   return null
@@ -380,21 +732,36 @@ const SubscriptionStatusCard = ({
 }: {
   status: PewPewSubscriptionStatus
 }) => {
+  const { i18n, t } = useTranslation()
   const expireAlert = getExpireAlert(status.expire)
+  const trafficAlert = getTrafficAlert(status.remainingTraffic)
+  const alerts = [expireAlert, trafficAlert].filter(Boolean) as Array<{
+    severity: 'error' | 'warning'
+    key: string
+  }>
+  const formatStatusValue = (value: string) => {
+    if (value === PEWPEW_UNKNOWN_STATUS) {
+      return t('home.pewpew.account.unavailable')
+    }
+    if (i18n.language === 'en') {
+      return value.replace(/^(\d+)\s*天$/, (_, days) => `${days} days`)
+    }
+    return value
+  }
   const items = [
     {
-      label: '剩余流量',
-      value: status.remainingTraffic,
+      label: t('home.pewpew.account.remainingTraffic'),
+      value: formatStatusValue(status.remainingTraffic),
       icon: <TravelExploreRounded fontSize="small" />,
     },
     {
-      label: '下次重置',
-      value: status.nextReset,
+      label: t('home.pewpew.account.nextReset'),
+      value: formatStatusValue(status.nextReset),
       icon: <RestartAltRounded fontSize="small" />,
     },
     {
-      label: '套餐到期',
-      value: status.expire,
+      label: t('home.pewpew.account.expire'),
+      value: formatStatusValue(status.expire),
       icon: <EventAvailableRounded fontSize="small" />,
     },
   ]
@@ -413,7 +780,7 @@ const SubscriptionStatusCard = ({
         variant="subtitle2"
         sx={{ fontWeight: 850, textAlign: 'center' }}
       >
-        账户信息
+        {t('home.pewpew.account.title')}
       </Typography>
 
       <Box
@@ -481,16 +848,85 @@ const SubscriptionStatusCard = ({
         ))}
       </Box>
 
-      {expireAlert && (
+      {alerts.map((alert) => (
         <Alert
-          severity={expireAlert.severity}
+          key={alert.key}
+          severity={alert.severity}
           variant="outlined"
           sx={{ borderRadius: 3, py: 0.35, alignItems: 'center' }}
         >
-          {expireAlert.text}
+          {t(alert.key)}
         </Alert>
-      )}
+      ))}
     </Stack>
+  )
+}
+
+const GettingStartedCard = ({
+  onImportRoutes,
+}: {
+  onImportRoutes: () => void
+}) => {
+  const { t } = useTranslation()
+  const steps = [
+    t('home.pewpew.onboarding.stepPaste'),
+    t('home.pewpew.onboarding.stepImport'),
+    t('home.pewpew.onboarding.stepConnect'),
+  ]
+
+  return (
+    <Paper
+      className="pewpew-transition"
+      elevation={0}
+      sx={(theme) => ({
+        borderRadius: 4,
+        p: { xs: 2, md: 2.35 },
+        bgcolor:
+          theme.palette.mode === 'light'
+            ? alpha(PEWPEW_BLUE, 0.055)
+            : alpha(PEWPEW_BLUE, 0.13),
+        border: `1px solid ${alpha(PEWPEW_BLUE, 0.12)}`,
+        boxSizing: 'border-box',
+      })}
+    >
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={1.5}
+        sx={{
+          alignItems: { xs: 'stretch', md: 'center' },
+          justifyContent: 'space-between',
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h6" sx={{ fontWeight: 850, mb: 0.75 }}>
+            {t('home.pewpew.onboarding.title')}
+          </Typography>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            sx={{ flexWrap: 'wrap' }}
+          >
+            {steps.map((step, index) => (
+              <Typography
+                key={step}
+                variant="body2"
+                color="text.secondary"
+                sx={{ fontWeight: 700 }}
+              >
+                {index + 1}. {step}
+              </Typography>
+            ))}
+          </Stack>
+        </Box>
+        <Button
+          variant="contained"
+          onClick={onImportRoutes}
+          sx={{ borderRadius: 999, fontWeight: 850, flexShrink: 0 }}
+        >
+          {t('home.pewpew.onboarding.importRoutes')}
+        </Button>
+      </Stack>
+    </Paper>
   )
 }
 
@@ -499,18 +935,18 @@ const ConnectionSettingsCard = ({
 }: {
   onDelayUpdated: () => void
 }) => {
+  const { t } = useTranslation()
+
   return (
     <Paper
+      className="pewpew-transition"
       elevation={0}
       sx={(theme) => ({
         borderRadius: 4,
         p: { xs: 2, md: 2.5 },
         boxSizing: 'border-box',
         overflow: 'hidden',
-        bgcolor:
-          theme.palette.mode === 'light'
-            ? alpha(theme.palette.common.white, 0.84)
-            : alpha(theme.palette.background.paper, 0.84),
+        bgcolor: 'var(--pewpew-panel-soft)',
         border: `1px solid ${alpha(PEWPEW_BLUE, 0.08)}`,
         boxShadow:
           theme.palette.mode === 'light'
@@ -520,34 +956,122 @@ const ConnectionSettingsCard = ({
     >
       <Stack spacing={1.75}>
         <Typography variant="h6" sx={{ fontWeight: 850 }}>
-          连接设置
+          {t('home.pewpew.connection.title')}
         </Typography>
 
-        <Grid container spacing={2.25}>
-          <Grid size={{ xs: 12, md: 7 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: 'minmax(0, 1.2fr) minmax(360px, 0.8fr)',
+            },
+            gap: 2.25,
+            minWidth: 0,
+            alignItems: 'stretch',
+          }}
+        >
+          <Box sx={{ minWidth: 0 }}>
             <CurrentProxyCard embedded onDelayUpdated={onDelayUpdated} />
-          </Grid>
-          <Grid size={{ xs: 12, md: 5 }}>
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
             <Stack spacing={1} sx={{ height: '100%' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 850 }}>
-                模式
+                {t('home.pewpew.connection.mode')}
               </Typography>
               <ClashModeCard />
             </Stack>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
       </Stack>
     </Paper>
   )
 }
 
-const AboutDialog = ({
+type PreferencePatch = Pick<
+  IVergeConfig,
+  | 'theme_mode'
+  | 'enable_auto_launch'
+  | 'enable_silent_start'
+  | 'enable_system_proxy'
+  | 'auto_close_connection'
+>
+
+const PreferencesDialog = ({
+  autoUpdateRoutesOnStartup,
   open,
   onClose,
+  onAutoUpdateRoutesOnStartupChange,
+  onCopyDiagnostics,
+  onRepairNetwork,
+  repairingNetwork,
 }: {
+  autoUpdateRoutesOnStartup: boolean
   open: boolean
   onClose: () => void
+  onAutoUpdateRoutesOnStartupChange: (enabled: boolean) => void
+  onCopyDiagnostics: () => Promise<void>
+  onRepairNetwork: () => Promise<void>
+  repairingNetwork: boolean
 }) => {
+  const { t } = useTranslation()
+  const { verge, mutateVerge, patchVerge } = useVerge()
+  const { current } = useProfiles()
+  const { switchClientLanguageMode, isLoading: languageLoading } = useI18n()
+  const [languageMode, setLanguageMode] = useState<ClientLanguageMode>(
+    () => getCachedClientLanguageMode() ?? 'system',
+  )
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      queueMicrotask(() =>
+        setLanguageMode(getCachedClientLanguageMode() ?? 'system'),
+      )
+    }
+  }, [open])
+
+  const updatePreference = async (patch: Partial<PreferencePatch>) => {
+    setSaving(true)
+    mutateVerge((prev) => (prev ? { ...prev, ...patch } : prev), false)
+
+    try {
+      await patchVerge(patch)
+    } catch (error) {
+      console.error('[PewPew] 偏好设置保存失败:', error)
+      showNotice.error(t('home.pewpew.preferences.saveFailed'))
+      mutateVerge()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleThemeModeChange = (_event: unknown, value: string | null) => {
+    if (!value) return
+    void updatePreference({
+      theme_mode: value as NonNullable<IVergeConfig['theme_mode']>,
+    })
+  }
+
+  const handleLanguageModeChange = async (
+    _event: unknown,
+    value: ClientLanguageMode | null,
+  ) => {
+    if (!value) return
+    const previous = languageMode
+    setLanguageMode(value)
+
+    try {
+      await switchClientLanguageMode(value)
+    } catch {
+      setLanguageMode(previous)
+      showNotice.error(t('home.pewpew.preferences.saveFailed'))
+    }
+  }
+
+  const preferenceDisabled = saving || languageLoading
+  const themeMode = verge?.theme_mode ?? 'system'
+
   return (
     <Dialog
       open={open}
@@ -556,14 +1080,330 @@ const AboutDialog = ({
       fullWidth
       slotProps={{
         paper: {
-          sx: { borderRadius: 4 },
+          sx: {
+            borderRadius: 4,
+            transition:
+              'background-color 280ms ease, color 240ms ease, border-color 280ms ease, box-shadow 280ms ease',
+          },
         },
       }}
     >
       <DialogTitle sx={{ pr: 6, fontWeight: 850 }}>
-        关于 / 开源许可
+        {t('home.pewpew.preferences.title')}
         <IconButton
-          aria-label="关闭"
+          aria-label={t('home.pewpew.about.close')}
+          onClick={onClose}
+          sx={{ position: 'absolute', right: 12, top: 10 }}
+        >
+          <CloseRounded />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2.25}>
+          <PreferenceSection title={t('home.pewpew.preferences.appearance')}>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={themeMode}
+              onChange={handleThemeModeChange}
+              disabled={preferenceDisabled}
+              sx={preferenceControlSx}
+            >
+              <ToggleButton value="system">
+                {t('home.pewpew.preferences.followSystem')}
+              </ToggleButton>
+              <ToggleButton value="light">
+                {t('home.pewpew.preferences.light')}
+              </ToggleButton>
+              <ToggleButton value="dark">
+                {t('home.pewpew.preferences.dark')}
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </PreferenceSection>
+
+          <PreferenceSection title={t('home.pewpew.preferences.language')}>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={languageMode}
+              onChange={handleLanguageModeChange}
+              disabled={preferenceDisabled}
+              sx={preferenceControlSx}
+            >
+              <ToggleButton value="system">
+                {t('home.pewpew.preferences.followSystem')}
+              </ToggleButton>
+              <ToggleButton value="zh-CN">
+                {t('home.pewpew.preferences.simplifiedChinese')}
+              </ToggleButton>
+              <ToggleButton value="en-US">
+                {t('home.pewpew.preferences.english')}
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </PreferenceSection>
+
+          <PreferenceSection title={t('home.pewpew.preferences.startup')}>
+            <Stack spacing={0.25}>
+              <PreferenceSwitch
+                label={t('home.pewpew.preferences.autoLaunch')}
+                checked={verge?.enable_auto_launch ?? false}
+                disabled={preferenceDisabled}
+                onChange={(checked) =>
+                  void updatePreference({ enable_auto_launch: checked })
+                }
+              />
+              <PreferenceSwitch
+                label={t('home.pewpew.preferences.silentStart')}
+                checked={verge?.enable_silent_start ?? false}
+                disabled={preferenceDisabled}
+                onChange={(checked) =>
+                  void updatePreference({ enable_silent_start: checked })
+                }
+              />
+              <PreferenceSwitch
+                label={t('home.pewpew.preferences.autoUpdateRoutesOnStartup')}
+                checked={autoUpdateRoutesOnStartup}
+                disabled={preferenceDisabled}
+                onChange={onAutoUpdateRoutesOnStartupChange}
+              />
+              <PreferenceSwitch
+                label={t('home.pewpew.preferences.autoStartPewPew')}
+                checked={verge?.enable_system_proxy ?? false}
+                disabled={preferenceDisabled}
+                onChange={(checked) => {
+                  if (checked && !current?.uid) {
+                    showNotice.error(t('home.pewpew.connection.importFirst'))
+                    return
+                  }
+                  void updatePreference({ enable_system_proxy: checked })
+                }}
+              />
+            </Stack>
+          </PreferenceSection>
+
+          <PreferenceSection title={t('home.pewpew.preferences.safety')}>
+            <PreferenceSwitch
+              label={t('home.pewpew.preferences.autoCloseOnQuit')}
+              checked={verge?.auto_close_connection ?? true}
+              disabled={preferenceDisabled}
+              onChange={(checked) =>
+                void updatePreference({ auto_close_connection: checked })
+              }
+            />
+          </PreferenceSection>
+
+          <Divider />
+
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            sx={{ justifyContent: 'flex-end' }}
+          >
+            <Button
+              variant="outlined"
+              onClick={() => void onRepairNetwork()}
+              disabled={preferenceDisabled || repairingNetwork}
+              startIcon={<BuildRounded />}
+              sx={{ borderRadius: 999, fontWeight: 800 }}
+            >
+              {t('home.pewpew.connectionStatus.repairNetwork')}
+            </Button>
+            <Button
+              variant="text"
+              onClick={() => void onCopyDiagnostics()}
+              startIcon={<ContentCopyRounded />}
+              sx={{ borderRadius: 999, fontWeight: 800 }}
+            >
+              {t('home.pewpew.diagnostics.copy')}
+            </Button>
+          </Stack>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} sx={{ borderRadius: 999, fontWeight: 800 }}>
+          {t('home.pewpew.about.close')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+const preferenceControlSx = (theme: Theme) => ({
+  p: 0.35,
+  borderRadius: 2.5,
+  bgcolor:
+    theme.palette.mode === 'light'
+      ? alpha(theme.palette.common.white, 0.74)
+      : alpha(theme.palette.common.white, 0.06),
+  border: `1px solid ${
+    theme.palette.mode === 'light'
+      ? alpha(theme.palette.grey[900], 0.12)
+      : alpha(theme.palette.common.white, 0.1)
+  }`,
+  '& .MuiToggleButton-root': {
+    minHeight: 38,
+    textTransform: 'none',
+    fontWeight: 800,
+    px: 1,
+    whiteSpace: 'normal',
+    lineHeight: 1.2,
+    border: 0,
+    borderRadius: '10px !important',
+    color: theme.palette.text.secondary,
+    '&.Mui-selected': {
+      bgcolor:
+        theme.palette.mode === 'light'
+          ? alpha(PEWPEW_BLUE, 0.12)
+          : alpha(PEWPEW_BLUE, 0.28),
+      color: theme.palette.mode === 'light' ? PEWPEW_BLUE : '#dbeafe',
+    },
+    '&.Mui-selected:hover': {
+      bgcolor:
+        theme.palette.mode === 'light'
+          ? alpha(PEWPEW_BLUE, 0.16)
+          : alpha(PEWPEW_BLUE, 0.34),
+    },
+  },
+})
+
+const PreferenceSection = ({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) => {
+  return (
+    <Stack spacing={1}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>
+        {title}
+      </Typography>
+      {children}
+    </Stack>
+  )
+}
+
+const PreferenceSwitch = ({
+  label,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  disabled: boolean
+  onChange: (checked: boolean) => void
+}) => {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) auto',
+        gap: 2,
+        alignItems: 'center',
+        minHeight: 42,
+        minWidth: 0,
+      }}
+    >
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: 650,
+          minWidth: 0,
+          overflowWrap: 'anywhere',
+        }}
+      >
+        {label}
+      </Typography>
+      <Switch
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        sx={pewpewSwitchSx}
+      />
+    </Box>
+  )
+}
+
+const pewpewSwitchSx = {
+  width: 48,
+  height: 30,
+  p: 0.75,
+  flexShrink: 0,
+  '& .MuiSwitch-switchBase': {
+    p: 0.75,
+    transitionDuration: '220ms',
+    '&.Mui-checked': {
+      transform: 'translateX(18px)',
+      color: '#fff',
+      '& + .MuiSwitch-track': {
+        bgcolor: '#2f7dff',
+        opacity: 1,
+      },
+      '& .MuiSwitch-thumb': {
+        borderColor: 'rgba(255,255,255,0.72)',
+      },
+    },
+    '&.Mui-disabled': {
+      color: '#9ca3af',
+      '& + .MuiSwitch-track': {
+        opacity: 1,
+        bgcolor: (theme: Theme) =>
+          theme.palette.mode === 'light' ? '#e5e7eb' : 'rgba(255,255,255,0.12)',
+      },
+      '& .MuiSwitch-thumb': {
+        borderColor: 'rgba(148,163,184,0.45)',
+      },
+    },
+  },
+  '& .MuiSwitch-thumb': {
+    width: 18,
+    height: 18,
+    bgcolor: '#fff',
+    border: '1px solid rgba(15,23,42,0.25)',
+    boxShadow: '0 2px 8px rgba(15,23,42,0.18)',
+  },
+  '& .MuiSwitch-track': {
+    borderRadius: 999,
+    opacity: 1,
+    bgcolor: (theme: Theme) =>
+      theme.palette.mode === 'light' ? '#cbd5e1' : 'rgba(255,255,255,0.22)',
+  },
+}
+
+const AboutDialog = ({
+  open,
+  onClose,
+  onCopyDiagnostics,
+}: {
+  open: boolean
+  onClose: () => void
+  onCopyDiagnostics: () => Promise<void>
+}) => {
+  const { t } = useTranslation()
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 4,
+            transition:
+              'background-color 280ms ease, color 240ms ease, border-color 280ms ease, box-shadow 280ms ease',
+          },
+        },
+      }}
+    >
+      <DialogTitle sx={{ pr: 6, fontWeight: 850 }}>
+        {t('home.pewpew.about.title')}
+        <IconButton
+          aria-label={t('home.pewpew.about.close')}
           onClick={onClose}
           sx={{ position: 'absolute', right: 12, top: 10 }}
         >
@@ -574,11 +1414,10 @@ const AboutDialog = ({
         <Stack spacing={2}>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.5 }}>
-              PewPew 云客户端
+              {t('home.pewpew.about.clientName')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              PewPew 云客户端基于 Clash Verge Rev、mihomo / Clash.Meta、Tauri
-              构建。
+              {t('home.pewpew.about.description')}
             </Typography>
           </Box>
 
@@ -586,16 +1425,16 @@ const AboutDialog = ({
 
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.5 }}>
-              开源许可
+              {t('home.pewpew.about.licenseTitle')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              本客户端遵守 GPL-3.0 开源许可，并保留上游项目致谢。
+              {t('home.pewpew.about.license')}
             </Typography>
           </Box>
 
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.5 }}>
-              上游致谢
+              {t('home.pewpew.about.credits')}
             </Typography>
             <Stack spacing={0.5}>
               <Link
@@ -626,10 +1465,22 @@ const AboutDialog = ({
           </Box>
 
           <Typography variant="caption" color="text.secondary">
-            客服微信：PewPew_VPN
+            {t('home.pewpew.about.support')}
           </Typography>
         </Stack>
       </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button
+          onClick={() => void onCopyDiagnostics()}
+          startIcon={<ContentCopyRounded />}
+          sx={{ borderRadius: 999, fontWeight: 800, mr: 'auto' }}
+        >
+          {t('home.pewpew.diagnostics.copy')}
+        </Button>
+        <Button onClick={onClose} sx={{ borderRadius: 999, fontWeight: 800 }}>
+          {t('home.pewpew.about.close')}
+        </Button>
+      </DialogActions>
     </Dialog>
   )
 }

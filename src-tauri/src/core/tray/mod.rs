@@ -575,6 +575,94 @@ fn create_proxy_menu_item(
     Ok((proxies_submenu, inline_proxy_items))
 }
 
+fn is_blocked_tray_route_name(name: &str) -> bool {
+    let value = name.trim();
+    if value.is_empty() {
+        return true;
+    }
+
+    let upper_value = value.to_uppercase();
+    if matches!(upper_value.as_str(), "DIRECT" | "REJECT" | "GLOBAL") {
+        return true;
+    }
+
+    let lower_value = value.to_lowercase();
+    [
+        "剩余流量",
+        "距离下次重置剩余",
+        "重置",
+        "套餐到期",
+        "到期",
+        "网址导航",
+        "官网",
+        "导航",
+        "流量",
+        "套餐",
+        "自动选择",
+        "手动选择",
+        "手动选择节点",
+        "负载均衡",
+        "ssone",
+        "订阅",
+        "remaining traffic",
+        "data remaining",
+        "remaining data",
+        "reset in",
+        "next reset",
+        "expires",
+        "expire date",
+        "expiration",
+        "official",
+        "navigation",
+        "subscription",
+    ]
+    .iter()
+    .any(|keyword| lower_value.contains(keyword))
+}
+
+fn is_displayable_tray_route(proxy_nodes_data: &Proxies, name: &str) -> bool {
+    if is_blocked_tray_route_name(name) {
+        return false;
+    }
+
+    if let Some(record) = proxy_nodes_data.proxies.get(name) {
+        if record.hidden.unwrap_or_default() {
+            return false;
+        }
+        if record.all.as_ref().map(|all| !all.is_empty()).unwrap_or(false) {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn resolve_tray_current_route(proxy_nodes_data: Option<&Proxies>) -> Option<String> {
+    let proxy_nodes_data = proxy_nodes_data?;
+    let preferred_groups = ["手动选择节点", "Proxy", "GLOBAL", "🚀 节点选择", "节点选择"];
+
+    for group_name in preferred_groups {
+        if let Some(group) = proxy_nodes_data.proxies.get(group_name)
+            && let Some(now) = group.now.as_deref()
+            && is_displayable_tray_route(proxy_nodes_data, now)
+        {
+            return Some(now.into());
+        }
+    }
+
+    proxy_nodes_data.proxies.values().find_map(|group| {
+        if group.all.as_ref().map(|all| all.is_empty()).unwrap_or(true) {
+            return None;
+        }
+        let now = group.now.as_deref()?;
+        if is_displayable_tray_route(proxy_nodes_data, now) {
+            Some(now.into())
+        } else {
+            None
+        }
+    })
+}
+
 async fn create_tray_menu(
     app_handle: &AppHandle,
     mode: Option<&str>,
@@ -593,6 +681,7 @@ async fn create_tray_menu(
     )
     .await
     .map_or(None, |res| res.ok());
+    let current_tray_route = resolve_tray_current_route(proxy_nodes_data.as_ref());
 
     let runtime_proxy_groups_order = cmd::get_runtime_config()
         .await
@@ -644,6 +733,12 @@ async fn create_tray_menu(
 
     // Pre-fetch all localized strings
     let texts = MenuTexts::new();
+    let _ = (
+        &texts.system_proxy,
+        MenuIds::CONNECT,
+        MenuIds::DISCONNECT,
+        MenuIds::SELECT_ROUTE,
+    );
     // Convert to references only when needed
     let profile_menu_items_refs: Vec<&dyn IsMenuItem<Wry>> = profile_menu_items
         .iter()
@@ -685,7 +780,7 @@ async fn create_tray_menu(
         hotkeys.get("clash_mode_direct").map(|s| s.as_str()),
     )?;
 
-    let outbound_modes = if show_outbound_modes_inline {
+    let _outbound_modes = if show_outbound_modes_inline {
         None
     } else {
         let current_mode_text = match current_proxy_mode {
@@ -707,7 +802,7 @@ async fn create_tray_menu(
         )?)
     };
 
-    let profiles = &Submenu::with_id_and_items(
+    let _profiles = &Submenu::with_id_and_items(
         app_handle,
         MenuIds::PROFILES,
         &texts.profiles,
@@ -718,7 +813,7 @@ async fn create_tray_menu(
     let proxy_sub_menus =
         create_subcreate_proxy_menu_item(app_handle, current_proxy_mode, proxy_group_order_map, proxy_nodes_data);
 
-    let (proxies_menu, inline_proxy_items) = match tray_proxy_groups_display_mode {
+    let (_proxies_menu, _inline_proxy_items) = match tray_proxy_groups_display_mode {
         "default" => create_proxy_menu_item(app_handle, false, proxy_sub_menus, &texts.proxies)?,
         "inline" => create_proxy_menu_item(app_handle, true, proxy_sub_menus, &texts.proxies)?,
         _ => (None, Vec::new()),
@@ -727,13 +822,43 @@ async fn create_tray_menu(
     let system_proxy = &CheckMenuItem::with_id(
         app_handle,
         MenuIds::SYSTEM_PROXY,
-        &texts.system_proxy,
+        if system_proxy_enabled {
+            &texts.disconnect
+        } else {
+            &texts.connect
+        },
         true,
         system_proxy_enabled,
         hotkeys.get("toggle_system_proxy").map(|s| s.as_str()),
     )?;
 
-    let tun_mode = &CheckMenuItem::with_id(
+    let current_route_name = current_tray_route.unwrap_or_else(|| texts.select_route.to_string().into());
+    let current_route_label = format!("{}: {}", texts.current_route, current_route_name);
+    let current_route = &MenuItem::with_id(
+        app_handle,
+        MenuIds::CURRENT_ROUTE,
+        current_route_label,
+        false,
+        None::<&str>,
+    )?;
+
+    let update_routes = &MenuItem::with_id(
+        app_handle,
+        MenuIds::UPDATE_ROUTES,
+        &texts.update_routes,
+        true,
+        None::<&str>,
+    )?;
+
+    let repair_network = &MenuItem::with_id(
+        app_handle,
+        MenuIds::REPAIR_NETWORK,
+        &texts.repair_network,
+        true,
+        None::<&str>,
+    )?;
+
+    let _tun_mode = &CheckMenuItem::with_id(
         app_handle,
         MenuIds::TUN_MODE,
         &texts.tun_mode,
@@ -750,7 +875,7 @@ async fn create_tray_menu(
         None::<&str>,
     )?;
 
-    let lightweight_mode = &CheckMenuItem::with_id(
+    let _lightweight_mode = &CheckMenuItem::with_id(
         app_handle,
         MenuIds::LIGHTWEIGHT_MODE,
         &texts.lightweight_mode,
@@ -771,7 +896,7 @@ async fn create_tray_menu(
 
     let open_core_log = &MenuItem::with_id(app_handle, MenuIds::CORE_LOG, &texts.core_log, true, None::<&str>)?;
 
-    let open_dir = &Submenu::with_id_and_items(
+    let _open_dir = &Submenu::with_id_and_items(
         app_handle,
         MenuIds::OPEN_DIR,
         &texts.open_dir,
@@ -797,7 +922,7 @@ async fn create_tray_menu(
         None::<&str>,
     )?;
 
-    let more = &Submenu::with_id_and_items(
+    let _more = &Submenu::with_id_and_items(
         app_handle,
         MenuIds::MORE,
         &texts.more,
@@ -820,43 +945,16 @@ async fn create_tray_menu(
 
     let separator = &PredefinedMenuItem::separator(app_handle)?;
 
-    // 动态构建菜单项
-    let mut menu_items: Vec<&dyn IsMenuItem<Wry>> = vec![open_window, separator];
-
-    if show_outbound_modes_inline {
-        menu_items.extend_from_slice(&[
-            rule_mode as &dyn IsMenuItem<Wry>,
-            global_mode as &dyn IsMenuItem<Wry>,
-            direct_mode as &dyn IsMenuItem<Wry>,
-        ]);
-    } else if let Some(ref outbound_modes) = outbound_modes {
-        menu_items.push(outbound_modes);
-    }
-
-    menu_items.extend_from_slice(&[separator, profiles]);
-
-    // 如果有代理节点，添加代理节点菜单
-    match tray_proxy_groups_display_mode {
-        "default" => {
-            menu_items.extend(proxies_menu.iter().map(|item| item as &dyn IsMenuItem<_>));
-        }
-        "inline" if !inline_proxy_items.is_empty() => {
-            menu_items.extend(inline_proxy_items.iter().map(|item| item.as_ref()));
-        }
-        _ => {}
-    }
-
-    menu_items.extend_from_slice(&[
+    let menu_items: Vec<&dyn IsMenuItem<Wry>> = vec![
+        open_window,
         separator,
         system_proxy as &dyn IsMenuItem<Wry>,
-        tun_mode as &dyn IsMenuItem<Wry>,
-        separator,
-        lightweight_mode as &dyn IsMenuItem<Wry>,
-        open_dir as &dyn IsMenuItem<Wry>,
-        more as &dyn IsMenuItem<Wry>,
+        current_route,
+        update_routes,
+        repair_network,
         separator,
         quit as &dyn IsMenuItem<Wry>,
-    ]);
+    ];
 
     let menu = tauri::menu::MenuBuilder::new(app_handle).items(&menu_items).build()?;
     Ok(menu)
@@ -933,6 +1031,66 @@ fn on_menu_event(_: &AppHandle, event: MenuEvent) {
             }
             MenuIds::SYSTEM_PROXY => {
                 feat::toggle_system_proxy().await;
+            }
+            MenuIds::UPDATE_ROUTES => {
+                let system_proxy_enabled = Config::verge().await.latest_arc().enable_system_proxy.unwrap_or(false);
+                if system_proxy_enabled {
+                    if let Err(err) = handle::Handle::mihomo().await.close_all_connections().await {
+                        logging!(
+                            warn,
+                            Type::Tray,
+                            "Failed to close connections before tray route update: {err}"
+                        );
+                    }
+                    let patch = IVerge {
+                        enable_system_proxy: Some(false),
+                        ..IVerge::default()
+                    };
+                    if let Err(err) = feat::patch_verge(&patch, false).await {
+                        logging!(
+                            error,
+                            Type::Tray,
+                            "Failed to disconnect before tray route update: {err}"
+                        );
+                        return;
+                    }
+                    handle::Handle::refresh_verge();
+                }
+
+                let profiles_config = Config::profiles().await;
+                let profiles = profiles_config.latest_arc();
+                if let Some(current_profile_uid) = profiles.get_current() {
+                    match profiles.get_item(current_profile_uid) {
+                        Ok(profile) => {
+                            let uid = current_profile_uid.clone();
+                            let option = profile.option.clone();
+                            if let Err(err) = feat::update_profile(&uid, option.as_ref(), true, true, true).await {
+                                logging!(error, Type::Tray, "Failed to update routes from tray: {err}");
+                            }
+                        }
+                        Err(err) => {
+                            logging!(error, Type::Tray, "Failed to read current profile from tray: {err}");
+                        }
+                    }
+                }
+            }
+            MenuIds::REPAIR_NETWORK => {
+                if let Err(err) = handle::Handle::mihomo().await.close_all_connections().await {
+                    logging!(
+                        warn,
+                        Type::Tray,
+                        "Failed to close connections from repair action: {err}"
+                    );
+                }
+                let patch = IVerge {
+                    enable_system_proxy: Some(false),
+                    ..IVerge::default()
+                };
+                if let Err(err) = feat::patch_verge(&patch, false).await {
+                    logging!(error, Type::Tray, "Failed to repair network from tray: {err}");
+                } else {
+                    handle::Handle::refresh_verge();
+                }
             }
             MenuIds::TUN_MODE => {
                 feat::toggle_tun_mode(None).await;

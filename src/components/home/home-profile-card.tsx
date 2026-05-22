@@ -11,6 +11,7 @@ import {
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
 import { useAppRefreshers } from '@/providers/app-data-context'
@@ -30,6 +31,7 @@ export const HomeProfileCard = ({
   onProfileUpdated,
   onSyncingChange,
 }: HomeProfileCardProps) => {
+  const { i18n, t } = useTranslation()
   const { refreshAll } = useAppRefreshers()
   const {
     indicator: networkEnabled,
@@ -42,14 +44,16 @@ export const HomeProfileCard = ({
   const [syncing, setSyncing] = useState(false)
 
   const currentStatus = useMemo(() => {
-    if (!current) return '尚未导入线路'
+    if (!current) return t('home.pewpew.subscription.notImported')
 
     const updated = current.updated
-      ? `上次更新时间：${dayjs(current.updated * 1000).format('YYYY-MM-DD HH:mm')}`
+      ? `${t('home.pewpew.subscription.lastUpdated')}${i18n.language === 'en' ? ': ' : '：'}${dayjs(
+          current.updated * 1000,
+        ).format('YYYY-MM-DD HH:mm')}`
       : ''
 
-    return updated || '当前状态：线路订阅已导入'
-  }, [current])
+    return updated || t('home.pewpew.subscription.imported')
+  }, [current, i18n.language, t])
 
   const setSyncingState = (value: boolean) => {
     setSyncing(value)
@@ -60,7 +64,7 @@ export const HomeProfileCard = ({
     await onProfileUpdated?.()
     const enhanced = await enhanceProfiles()
     if (!enhanced) {
-      throw new Error('线路配置校验失败，请检查订阅链接或联系客服')
+      throw new Error('route enhancement failed')
     }
     await onProfileUpdated?.()
     await refreshAll()
@@ -69,7 +73,7 @@ export const HomeProfileCard = ({
   const closeNetworkBeforeSync = async () => {
     if (!networkEnabled && !networkConfigEnabled) return false
 
-    setStatusText('已临时关闭 PewPew 云，正在更新线路...')
+    setStatusText(t('home.pewpew.subscription.temporarilyStopped'))
     await setSystemProxyEnabled(false)
     await invalidateProxyState()
     return true
@@ -91,12 +95,12 @@ export const HomeProfileCard = ({
     const url = subscriptionUrl.trim()
 
     if (!url) {
-      setStatusText('请先粘贴订阅链接')
+      setStatusText(t('home.pewpew.subscription.pasteFirst'))
       return
     }
 
     if (!isSubscriptionUrl(url)) {
-      setStatusText('订阅链接需要以 http:// 或 https:// 开头')
+      setStatusText(t('home.pewpew.subscription.invalidUrl'))
       return
     }
 
@@ -106,18 +110,18 @@ export const HomeProfileCard = ({
       const closedNetwork = await closeNetworkBeforeSync()
       setStatusText(
         closedNetwork
-          ? '已临时关闭 PewPew 云，正在更新线路...'
-          : '正在导入线路...',
+          ? t('home.pewpew.subscription.temporarilyStopped')
+          : t('home.pewpew.subscription.importing'),
       )
       await importLineWithFallback(url)
       await refreshSubscription()
       setSubscriptionUrl('')
-      setStatusText('线路导入成功，请点击“开启 PewPew 云”开始使用')
-      showNotice.success('线路导入成功')
+      setStatusText(t('home.pewpew.subscription.importSuccess'))
+      showNotice.success(t('home.pewpew.subscription.importSuccess'))
     } catch (err) {
       console.error('[PewPew] 线路导入失败:', err)
-      setStatusText('线路导入失败，请检查订阅链接或联系客服')
-      showNotice.error(err)
+      setStatusText(t('home.pewpew.subscription.importFailed'))
+      showNotice.error(t('home.pewpew.subscription.importFailed'))
     } finally {
       setSyncingState(false)
     }
@@ -125,7 +129,7 @@ export const HomeProfileCard = ({
 
   const handleUpdate = useLockFn(async () => {
     if (!current?.uid) {
-      setStatusText('请先导入订阅链接')
+      setStatusText(t('home.pewpew.connection.importFirst'))
       return
     }
 
@@ -135,17 +139,17 @@ export const HomeProfileCard = ({
       const closedNetwork = await closeNetworkBeforeSync()
       setStatusText(
         closedNetwork
-          ? '已临时关闭 PewPew 云，正在更新线路...'
-          : '正在更新线路...',
+          ? t('home.pewpew.subscription.temporarilyStopped')
+          : t('home.pewpew.subscription.updating'),
       )
       await updateProfile(current.uid, current.option)
       await refreshSubscription()
-      setStatusText('线路更新成功，请点击“开启 PewPew 云”开始使用')
-      showNotice.success('线路更新成功')
+      setStatusText(t('home.pewpew.subscription.updateSuccess'))
+      showNotice.success(t('home.pewpew.subscription.updateSuccess'))
     } catch (err) {
       console.error('[PewPew] 线路更新失败:', err)
-      setStatusText('线路更新失败，请检查订阅链接或联系客服')
-      showNotice.error(err)
+      setStatusText(t('home.pewpew.subscription.updateFailed'))
+      showNotice.error(t('home.pewpew.subscription.updateFailed'))
     } finally {
       setSyncingState(false)
     }
@@ -155,16 +159,14 @@ export const HomeProfileCard = ({
 
   return (
     <Paper
+      className="pewpew-transition"
       elevation={0}
       sx={(theme) => ({
         borderRadius: 4,
         p: { xs: 2, md: 2.5 },
         boxSizing: 'border-box',
         overflow: 'hidden',
-        bgcolor:
-          theme.palette.mode === 'light'
-            ? alpha(theme.palette.common.white, 0.72)
-            : alpha(theme.palette.background.paper, 0.78),
+        bgcolor: 'var(--pewpew-panel-muted)',
         border: `1px solid ${alpha(theme.palette.primary.main, 0.08)}`,
         boxShadow:
           theme.palette.mode === 'light'
@@ -180,10 +182,10 @@ export const HomeProfileCard = ({
         >
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="h6" sx={{ fontWeight: 850 }}>
-              线路订阅
+              {t('home.pewpew.subscription.title')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              粘贴链接后导入或更新线路
+              {t('home.pewpew.subscription.description')}
             </Typography>
           </Box>
         </Stack>
@@ -191,13 +193,13 @@ export const HomeProfileCard = ({
         <TextField
           fullWidth
           size="small"
-          placeholder="粘贴订阅链接"
+          placeholder={t('home.pewpew.subscription.placeholder')}
           value={subscriptionUrl}
           onChange={(event) => setSubscriptionUrl(event.target.value)}
           sx={{
             '& .MuiOutlinedInput-root': {
               borderRadius: 2.5,
-              bgcolor: 'background.paper',
+              bgcolor: 'var(--pewpew-input-bg)',
             },
           }}
         />
@@ -211,7 +213,7 @@ export const HomeProfileCard = ({
             startIcon={<CloudUploadOutlined />}
             sx={{ borderRadius: 999, py: 1 }}
           >
-            导入线路
+            {t('home.pewpew.subscription.import')}
           </Button>
           <Button
             fullWidth
@@ -221,7 +223,7 @@ export const HomeProfileCard = ({
             startIcon={<UpdateOutlined />}
             sx={{ borderRadius: 999, py: 1 }}
           >
-            更新线路
+            {t('home.pewpew.subscription.update')}
           </Button>
         </Stack>
 

@@ -35,7 +35,7 @@ service:
   adminInstallPrompt: 安装 Clash Verge 服务需要管理员权限
   adminUninstallPrompt: 卸载 Clash Verge 服务需要管理员权限
 tray:
-  dashboard: 仪表板
+  dashboard: 打开 PewPew 云客户端
   ruleMode: 规则模式
   globalMode: 全局模式
   directMode: 直连模式
@@ -45,6 +45,12 @@ tray:
   global: 全局
   profiles: 订阅
   proxies: 代理
+  connect: 连接
+  disconnect: 断开连接
+  currentRoute: 当前线路
+  selectRoute: 请选择线路
+  updateRoutes: 更新线路
+  repairNetwork: 恢复网络
   systemProxy: 系统代理
   tunMode: TUN 模式
   closeAllConnections: 关闭所有连接

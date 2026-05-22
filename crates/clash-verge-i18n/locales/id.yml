@@ -45,6 +45,12 @@ tray:
   global: Global
   profiles: Profil
   proxies: Proksi
+  connect: Connect
+  disconnect: Disconnect
+  currentRoute: Current route
+  selectRoute: Select a route
+  updateRoutes: Update Routes
+  repairNetwork: Repair Network
   systemProxy: Proksi Sistem
   tunMode: Mode TUN
   closeAllConnections: Tutup Semua Koneksi

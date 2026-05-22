@@ -171,6 +171,127 @@ export interface TranslationResources {
           settings: string
         }
       }
+      pewpew: {
+        about: {
+          clientName: string
+          close: string
+          credits: string
+          description: string
+          license: string
+          licenseTitle: string
+          support: string
+          title: string
+        }
+        account: {
+          dataExhausted: string
+          expire: string
+          expired: string
+          expiringSoon: string
+          lowData: string
+          nextReset: string
+          remainingTraffic: string
+          title: string
+          unavailable: string
+        }
+        connection: {
+          globalMode: string
+          globalModeDescription: string
+          importFirst: string
+          mode: string
+          recommended: string
+          recommendedShort: string
+          route: string
+          routeChangeFailed: string
+          selectRoute: string
+          smartMode: string
+          smartModeDescription: string
+          title: string
+        }
+        connectionStatus: {
+          connect: string
+          connected: string
+          connectFailed: string
+          connecting: string
+          disconnect: string
+          disconnected: string
+          disconnectFailed: string
+          disconnecting: string
+          failed: string
+          reconnect: string
+          repairFailed: string
+          repairNetwork: string
+          repairSuccess: string
+          title: string
+        }
+        delay: {
+          refresh: string
+          testing: string
+          unavailable: string
+          unit: string
+        }
+        diagnostics: {
+          copy: string
+          copyFailed: string
+          copySuccess: string
+        }
+        header: {
+          about: string
+          preferences: string
+          subtitle: string
+          title: string
+          wechat: string
+        }
+        onboarding: {
+          importRoutes: string
+          stepConnect: string
+          stepImport: string
+          stepPaste: string
+          title: string
+        }
+        preferences: {
+          appearance: string
+          autoCloseOnQuit: string
+          autoLaunch: string
+          autoStartPewPew: string
+          autoUpdateRoutesOnStartup: string
+          dark: string
+          english: string
+          followSystem: string
+          language: string
+          light: string
+          safety: string
+          saveFailed: string
+          silentStart: string
+          simplifiedChinese: string
+          startup: string
+          title: string
+        }
+        subscription: {
+          autoUpdateFailed: string
+          description: string
+          import: string
+          imported: string
+          importFailed: string
+          importing: string
+          importSuccess: string
+          invalidUrl: string
+          lastUpdated: string
+          notImported: string
+          pasteFirst: string
+          placeholder: string
+          temporarilyStopped: string
+          title: string
+          update: string
+          updateFailed: string
+          updateSuccess: string
+          updating: string
+        }
+        switch: {
+          currentRoute: string
+          currentRouteEmpty: string
+          currentRouteWithDelay: string
+        }
+      }
     }
     layout: {
       components: {

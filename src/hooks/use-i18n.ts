@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import type { ClientLanguageMode } from '@/services/i18n'
 import {
+  changeClientLanguageMode,
   changeLanguage,
   resolveLanguage,
   supportedLanguages,
@@ -43,10 +45,32 @@ export const useI18n = () => {
     [i18n.language, patchVerge],
   )
 
+  const switchClientLanguageMode = useCallback(
+    async (mode: ClientLanguageMode) => {
+      setIsLoading(true)
+      try {
+        const targetLanguage = await changeClientLanguageMode(mode)
+
+        if (patchVerge) {
+          await patchVerge({ language: targetLanguage })
+        }
+
+        return targetLanguage
+      } catch (error) {
+        console.error('Failed to change client language:', error)
+        throw error
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [patchVerge],
+  )
+
   return {
     currentLanguage: i18n.language,
     supportedLanguages,
     switchLanguage,
+    switchClientLanguageMode,
     isLoading,
     t,
   }

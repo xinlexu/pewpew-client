@@ -32,13 +32,10 @@ export const updateLastCheckTime = (timestamp?: number): number => {
 // --- useUpdate hook ---
 
 export const useUpdate = (enabled: boolean = true) => {
-  const { verge } = useVerge()
-  const { auto_check_update } = verge || {}
+  useVerge()
 
-  // Determine if we should check for updates
-  // If enabled is explicitly false, don't check
-  // Otherwise, respect the auto_check_update setting (or default to true if null/undefined for manual triggers)
-  const shouldCheck = enabled && auto_check_update !== false
+  // PewPew 客户版不检查 Clash Verge Rev 上游更新源。
+  const shouldCheck = enabled && false
 
   const {
     data: updateInfo,

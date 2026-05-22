@@ -17,6 +17,7 @@ import {
   useTheme,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import { useProfiles } from '@/hooks/use-profiles'
@@ -49,15 +50,24 @@ const getLineDelayValue = (proxy: PewPewProxyOption, groupName: string) => {
   return delayManager.getDelayFix(proxy.record, groupName)
 }
 
-const formatLineDelay = (proxy: PewPewProxyOption, groupName: string) => {
+const formatLineDelay = (
+  proxy: PewPewProxyOption,
+  groupName: string,
+  t: (key: string) => string,
+) => {
   const delay = getLineDelayValue(proxy, groupName)
-  if (delay === -2) return { label: '测试中...', color: 'default' as const }
+  if (delay === -2) {
+    return { label: t('home.pewpew.delay.testing'), color: 'default' as const }
+  }
   if (delay === 0 || delay >= 10000) {
-    return { label: '不可用', color: 'error' as const }
+    return {
+      label: t('home.pewpew.delay.unavailable'),
+      color: 'error' as const,
+    }
   }
   if (delay > 0) {
     return {
-      label: `${delayManager.formatDelay(delay)} ms`,
+      label: `${delayManager.formatDelay(delay)} ${t('home.pewpew.delay.unit')}`,
       color: delay < 400 ? ('success' as const) : ('warning' as const),
     }
   }
@@ -69,6 +79,7 @@ export const CurrentProxyCard = ({
   onDelayUpdated,
 }: CurrentProxyCardProps) => {
   const theme = useTheme()
+  const { t } = useTranslation()
   const { proxies } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
   const { isCoreDataPending } = useCoreDataStatus()
@@ -95,7 +106,7 @@ export const CurrentProxyCard = ({
     },
     onError: (error) => {
       console.error('[PewPew] 线路切换失败:', error)
-      showNotice.error('线路切换失败，请稍后重试或联系客服')
+      showNotice.error(t('home.pewpew.connection.routeChangeFailed'))
       refreshProxy()
     },
   })
@@ -160,14 +171,14 @@ export const CurrentProxyCard = ({
     <Stack spacing={1} sx={{ minWidth: 0 }}>
       <Stack spacing={0.25}>
         <Typography variant="subtitle1" sx={{ fontWeight: 850 }}>
-          线路
+          {t('home.pewpew.connection.route')}
         </Typography>
       </Stack>
 
       {!currentProfile ? (
         <Box sx={{ textAlign: 'center', py: 2.25 }}>
           <Typography variant="body1" color="text.secondary">
-            请先导入线路
+            {t('home.pewpew.connection.importFirst')}
           </Typography>
         </Box>
       ) : isCoreDataPending ? (
@@ -175,7 +186,7 @@ export const CurrentProxyCard = ({
       ) : !group || options.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 2.25 }}>
           <Typography variant="body1" color="text.secondary">
-            请先导入线路
+            {t('home.pewpew.connection.importFirst')}
           </Typography>
         </Box>
       ) : (
@@ -191,7 +202,7 @@ export const CurrentProxyCard = ({
                   selected
                 ) : (
                   <Typography component="span" color="text.secondary">
-                    选择线路
+                    {t('home.pewpew.connection.selectRoute')}
                   </Typography>
                 )
               }
@@ -211,7 +222,7 @@ export const CurrentProxyCard = ({
               }}
             >
               {options.map((proxy) => {
-                const delay = formatLineDelay(proxy, groupName)
+                const delay = formatLineDelay(proxy, groupName, t)
                 return (
                   <MenuItem
                     key={proxy.name}
@@ -244,7 +255,7 @@ export const CurrentProxyCard = ({
           <IconButton
             size="small"
             onClick={() => void checkVisibleLineDelay(true)}
-            aria-label="测试线路延迟"
+            aria-label={t('home.pewpew.delay.refresh')}
             sx={(theme) => ({
               width: 34,
               height: 34,
@@ -265,7 +276,7 @@ export const CurrentProxyCard = ({
 
   return (
     <EnhancedCard
-      title="线路选择"
+      title={t('home.pewpew.connection.route')}
       icon={
         <Box sx={{ color: currentLine ? 'success.main' : 'text.disabled' }}>
           {currentLine ? <SignalStrong /> : <SignalNone color="disabled" />}

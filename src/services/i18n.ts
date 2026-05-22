@@ -19,6 +19,9 @@ export const supportedLanguages = [
 
 export const FALLBACK_LANGUAGE = 'zh'
 const LANGUAGE_STORAGE_KEY = 'verge-language'
+const CLIENT_LANGUAGE_MODE_STORAGE_KEY = 'pewpew-language-mode'
+
+export type ClientLanguageMode = 'system' | 'zh-CN' | 'en-US'
 
 const normalizeLanguage = (language?: string) =>
   language?.toLowerCase().replace(/_/g, '-')
@@ -42,6 +45,50 @@ export const resolveLanguage = (language?: string) => {
   }
 
   return FALLBACK_LANGUAGE
+}
+
+const getNavigatorLanguages = () => {
+  if (typeof navigator === 'undefined') return []
+  const languages = Array.isArray(navigator.languages)
+    ? navigator.languages
+    : []
+  return [navigator.language, ...languages].filter(Boolean)
+}
+
+export const resolveSystemClientLanguage = () => {
+  const languages = getNavigatorLanguages()
+  if (
+    languages.some((language) => normalizeLanguage(language)?.startsWith('zh'))
+  ) {
+    return 'zh'
+  }
+  return 'en'
+}
+
+export const resolveClientLanguage = (language?: string) => {
+  const normalized = normalizeLanguage(language)
+  if (!normalized) return resolveSystemClientLanguage()
+  if (normalized.startsWith('zh')) return 'zh'
+  if (normalized.startsWith('en')) return 'en'
+  if (normalized === 'system') return resolveSystemClientLanguage()
+  return 'en'
+}
+
+export const resolveClientLanguageMode = (
+  mode: ClientLanguageMode = 'system',
+) => {
+  if (mode === 'zh-CN') return 'zh'
+  if (mode === 'en-US') return 'en'
+  return resolveSystemClientLanguage()
+}
+
+export const normalizeClientLanguageMode = (
+  value?: string | null,
+): ClientLanguageMode | undefined => {
+  if (value === 'system' || value === 'zh-CN' || value === 'en-US') {
+    return value
+  }
+  return undefined
 }
 
 const getLanguageStorage = () => {
@@ -73,6 +120,31 @@ export const getCachedLanguage = () => {
     return cached ? resolveLanguage(cached) : undefined
   } catch (error) {
     console.warn('[i18n] Failed to read cached language:', error)
+    return undefined
+  }
+}
+
+export const cacheClientLanguageMode = (mode: ClientLanguageMode) => {
+  const storage = getLanguageStorage()
+  if (!storage) return
+
+  try {
+    storage.setItem(CLIENT_LANGUAGE_MODE_STORAGE_KEY, mode)
+  } catch (error) {
+    console.warn('[i18n] Failed to cache client language mode:', error)
+  }
+}
+
+export const getCachedClientLanguageMode = () => {
+  const storage = getLanguageStorage()
+  if (!storage) return undefined
+
+  try {
+    return normalizeClientLanguageMode(
+      storage.getItem(CLIENT_LANGUAGE_MODE_STORAGE_KEY),
+    )
+  } catch (error) {
+    console.warn('[i18n] Failed to read client language mode:', error)
     return undefined
   }
 }
@@ -147,6 +219,13 @@ export const changeLanguage = async (language: string) => {
 
   await i18n.changeLanguage(targetLanguage)
   cacheLanguage(targetLanguage)
+}
+
+export const changeClientLanguageMode = async (mode: ClientLanguageMode) => {
+  cacheClientLanguageMode(mode)
+  const targetLanguage = resolveClientLanguageMode(mode)
+  await changeLanguage(targetLanguage)
+  return targetLanguage
 }
 
 export const initializeLanguage = async (

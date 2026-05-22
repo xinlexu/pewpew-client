@@ -1,9 +1,12 @@
 import { getVergeConfig } from './cmds'
 import {
   cacheLanguage,
+  getCachedClientLanguageMode,
   getCachedLanguage,
   initializeLanguage,
-  resolveLanguage,
+  resolveClientLanguage,
+  resolveClientLanguageMode,
+  resolveSystemClientLanguage,
 } from './i18n'
 
 let vergeConfigCache: IVergeConfig | null | undefined
@@ -61,9 +64,14 @@ export const preloadLanguage = async (
   vergeConfig?: IVergeConfig | null,
   loadConfig: () => Promise<IVergeConfig | null> = preloadConfig,
 ) => {
+  const cachedClientLanguageMode = getCachedClientLanguageMode()
+  if (cachedClientLanguageMode) {
+    return resolveClientLanguageMode(cachedClientLanguageMode)
+  }
+
   const cachedLanguage = getCachedLanguage()
   if (cachedLanguage) {
-    return cachedLanguage
+    return resolveClientLanguage(cachedLanguage)
   }
 
   let resolvedConfig = vergeConfig
@@ -82,14 +90,12 @@ export const preloadLanguage = async (
 
   const languageFromConfig = resolvedConfig?.language
   if (languageFromConfig) {
-    const resolved = resolveLanguage(languageFromConfig)
+    const resolved = resolveClientLanguage(languageFromConfig)
     cacheLanguage(resolved)
     return resolved
   }
 
-  const browserLanguage = resolveLanguage(
-    typeof navigator !== 'undefined' ? navigator.language : undefined,
-  )
+  const browserLanguage = resolveSystemClientLanguage()
   cacheLanguage(browserLanguage)
   return browserLanguage
 }

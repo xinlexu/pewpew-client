@@ -45,6 +45,12 @@ tray:
   global: Глобаль
   profiles: Профильләр
   proxies: Проксилар
+  connect: Connect
+  disconnect: Disconnect
+  currentRoute: Current route
+  selectRoute: Select a route
+  updateRoutes: Update Routes
+  repairNetwork: Repair Network
   systemProxy: Системалы прокси
   tunMode: TUN режимы
   closeAllConnections: Барлык тоташуларны ябу
