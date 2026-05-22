@@ -50,12 +50,6 @@
 
 name: "PR AI Slop Review"
 on:
-  pull_request_target:
-    types:
-    - opened
-    - reopened
-    - synchronize
-  # roles: all # Roles processed as role check in pre-activation job
   workflow_dispatch:
     inputs:
       aw_context:

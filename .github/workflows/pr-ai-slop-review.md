@@ -5,9 +5,6 @@ description: |
   comment when the risk is high enough to warrant follow-up.
 
 on:
-  roles: all
-  pull_request_target:
-    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 checkout: false

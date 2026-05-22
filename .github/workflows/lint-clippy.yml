@@ -3,6 +3,11 @@ name: Clippy Lint
 on:
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
 env:
   HUSKY: 0
 
