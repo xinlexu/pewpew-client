@@ -12,8 +12,8 @@
     overflow: hidden;
 
     &__left {
+      display: none !important;
       flex: 1 0 200px;
-      display: flex;
       height: 100%;
       width: 100%;
       padding: 0 0 8px;
@@ -83,10 +83,12 @@
       position: relative;
       flex: 1 1 100%;
       height: 100%;
+      min-width: 0;
+      width: 100%;
 
       .the-bar {
-        height: 36px;
-        display: flex;
+        height: 0;
+        display: none;
         justify-content: end;
         box-sizing: border-box;
         z-index: 2;
@@ -101,7 +103,7 @@
         position: absolute;
         top: 0;
         left: 0;
-        right: 1px;
+        right: 0;
         bottom: 0px;
       }
     }
@@ -138,7 +140,7 @@
     }
 
     .layout-content__right .the-content {
-      top: 5px;
+      top: 0;
     }
   }
 }
@@ -166,7 +168,7 @@
     }
 
     .layout-content__right .the-content {
-      top: 5px;
+      top: 0;
     }
 
     .layout-content__left .the-newbtn {

@@ -1,249 +1,90 @@
-import {
-  ComputerRounded,
-  TroubleshootRounded,
-  HelpOutlineRounded,
-  SvgIconComponent,
-} from '@mui/icons-material'
-import {
-  Box,
-  Typography,
-  Stack,
-  Paper,
-  Tooltip,
-  alpha,
-  useTheme,
-  Fade,
-} from '@mui/material'
-import { useState, useMemo, memo, FC } from 'react'
-import { useTranslation } from 'react-i18next'
+import { PowerSettingsNewRounded } from '@mui/icons-material'
+import { Box, Button, Stack, Typography, alpha, useTheme } from '@mui/material'
+import { useLockFn } from 'ahooks'
+import { FC, useState } from 'react'
 
-import ProxyControlSwitches from '@/components/shared/proxy-control-switches'
 import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
-import { useSystemState } from '@/hooks/use-system-state'
-import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
 
-const LOCAL_STORAGE_TAB_KEY = 'clash-verge-proxy-active-tab'
-
-interface TabButtonProps {
-  isActive: boolean
-  onClick: () => void
-  icon: SvgIconComponent
-  label: string
-  hasIndicator?: boolean
+interface ProxyTunCardProps {
+  disabled?: boolean
 }
 
-// Tab组件
-const TabButton: FC<TabButtonProps> = memo(
-  ({ isActive, onClick, icon: Icon, label, hasIndicator = false }) => (
-    <Paper
-      elevation={isActive ? 2 : 0}
-      onClick={onClick}
-      sx={{
-        cursor: 'pointer',
-        px: 2,
-        py: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 1,
-        bgcolor: isActive ? 'primary.main' : 'background.paper',
-        color: isActive ? 'primary.contrastText' : 'text.primary',
-        borderRadius: 1.5,
-        flex: 1,
-        maxWidth: 160,
-        transition: 'all 0.2s ease-in-out',
-        position: 'relative',
-        '&:hover': {
-          transform: 'translateY(-1px)',
-          boxShadow: 1,
-        },
-        '&:after': isActive
-          ? {
-              content: '""',
-              position: 'absolute',
-              bottom: -9,
-              left: '50%',
-              width: 2,
-              height: 9,
-              bgcolor: 'primary.main',
-              transform: 'translateX(-50%)',
-            }
-          : {},
-      }}
-    >
-      <Icon fontSize="small" />
-      <Typography variant="body2" sx={{ fontWeight: isActive ? 600 : 400 }}>
-        {label}
-      </Typography>
-      {hasIndicator && (
-        <Box
-          sx={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            bgcolor: isActive ? '#fff' : 'success.main',
-            position: 'absolute',
-            top: 8,
-            right: 8,
-          }}
-        />
-      )}
-    </Paper>
-  ),
-)
-
-interface TabDescriptionProps {
-  description: string
-  tooltipTitle: string
-}
-
-// 描述文本组件
-const TabDescription: FC<TabDescriptionProps> = memo(
-  ({ description, tooltipTitle }) => (
-    <Fade in={true} timeout={200}>
-      <Typography
-        variant="caption"
-        component="div"
-        sx={{
-          width: '95%',
-          textAlign: 'center',
-          color: 'text.secondary',
-          p: 0.8,
-          borderRadius: 1,
-          borderColor: 'primary.main',
-          borderWidth: 1,
-          borderStyle: 'solid',
-          backgroundColor: 'background.paper',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 0.5,
-          wordBreak: 'break-word',
-          hyphens: 'auto',
-        }}
-      >
-        {description}
-        <Tooltip title={tooltipTitle}>
-          <HelpOutlineRounded
-            sx={{ fontSize: 14, opacity: 0.7, flexShrink: 0 }}
-          />
-        </Tooltip>
-      </Typography>
-    </Fade>
-  ),
-)
-
-export const ProxyTunCard: FC = () => {
-  const { t } = useTranslation()
+export const ProxyTunCard: FC<ProxyTunCardProps> = ({ disabled = false }) => {
   const theme = useTheme()
-  const [activeTab, setActiveTab] = useState<string>(
-    () => localStorage.getItem(LOCAL_STORAGE_TAB_KEY) || 'system',
-  )
+  const { indicator: systemProxyEnabled, setSystemProxyEnabled } =
+    useSystemProxyState()
+  const [pendingState, setPendingState] = useState<boolean | null>(null)
 
-  const { verge } = useVerge()
-  const { isTunModeAvailable } = useSystemState()
-  const { configState: systemProxyConfigState } = useSystemProxyState()
+  const enabled = pendingState ?? systemProxyEnabled
 
-  const { enable_tun_mode } = verge ?? {}
+  const handleToggle = useLockFn(async () => {
+    const next = !enabled
+    setPendingState(next)
 
-  const handleError = (err: unknown) => {
-    showNotice.error(err)
-  }
-
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab)
-    localStorage.setItem(LOCAL_STORAGE_TAB_KEY, tab)
-  }
-
-  const tabDescription = useMemo(() => {
-    if (activeTab === 'system') {
-      return {
-        text: systemProxyConfigState
-          ? t('home.components.proxyTun.status.systemProxyEnabled')
-          : t('home.components.proxyTun.status.systemProxyDisabled'),
-        tooltip: t('home.components.proxyTun.tooltips.systemProxy'),
-      }
-    } else {
-      return {
-        text: !isTunModeAvailable
-          ? t('home.components.proxyTun.status.tunModeServiceRequired')
-          : enable_tun_mode
-            ? t('home.components.proxyTun.status.tunModeEnabled')
-            : t('home.components.proxyTun.status.tunModeDisabled'),
-        tooltip: t('home.components.proxyTun.tooltips.tunMode'),
-      }
+    try {
+      await setSystemProxyEnabled(next)
+    } catch (err) {
+      showNotice.error(err)
+      setPendingState(systemProxyEnabled)
+    } finally {
+      setPendingState(null)
     }
-  }, [
-    activeTab,
-    systemProxyConfigState,
-    enable_tun_mode,
-    isTunModeAvailable,
-    t,
-  ])
+  })
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          position: 'relative',
-          zIndex: 2,
-        }}
-      >
-        <TabButton
-          isActive={activeTab === 'system'}
-          onClick={() => handleTabChange('system')}
-          icon={ComputerRounded}
-          label={t('settings.sections.system.toggles.systemProxy')}
-          hasIndicator={systemProxyConfigState}
-        />
-        <TabButton
-          isActive={activeTab === 'tun'}
-          onClick={() => handleTabChange('tun')}
-          icon={TroubleshootRounded}
-          label={t('settings.sections.system.toggles.tunMode')}
-          hasIndicator={enable_tun_mode && isTunModeAvailable}
-        />
+    <Button
+      fullWidth
+      variant="contained"
+      color={enabled ? 'success' : 'primary'}
+      onClick={handleToggle}
+      disabled={disabled}
+      sx={{
+        minHeight: { xs: 150, sm: 168 },
+        borderRadius: 999,
+        boxShadow: enabled
+          ? '0 18px 40px rgba(30, 150, 95, 0.28)'
+          : '0 18px 40px rgba(44, 103, 220, 0.28)',
+        textTransform: 'none',
+        justifyContent: 'center',
+        px: { xs: 2, sm: 3 },
+        py: 2,
+        bgcolor: enabled ? '#16a36f' : '#2869df',
+        background: enabled
+          ? 'linear-gradient(135deg, #16a36f 0%, #39bd86 100%)'
+          : 'linear-gradient(135deg, #2869df 0%, #5b8cf0 100%)',
+        '&:hover': {
+          boxShadow: enabled
+            ? '0 20px 44px rgba(30, 150, 95, 0.34)'
+            : '0 20px 44px rgba(44, 103, 220, 0.34)',
+          bgcolor: enabled ? '#11875c' : '#205ac2',
+        },
+      }}
+    >
+      <Stack spacing={1.25} sx={{ alignItems: 'center', textAlign: 'center' }}>
+        <Box
+          sx={{
+            width: 62,
+            height: 62,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: alpha(theme.palette.common.white, 0.18),
+            border: `1px solid ${alpha(theme.palette.common.white, 0.22)}`,
+          }}
+        >
+          <PowerSettingsNewRounded sx={{ fontSize: 34 }} />
+        </Box>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 900, lineHeight: 1.15 }}>
+            {enabled ? '关闭 PewPew 云' : '开启 PewPew 云'}
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 0.75, opacity: 0.9 }}>
+            {enabled ? '当前已开启' : '当前未开启'}
+          </Typography>
+        </Box>
       </Stack>
-
-      <Box
-        sx={{
-          width: '100%',
-          my: 1,
-          position: 'relative',
-          display: 'flex',
-          justifyContent: 'center',
-          overflow: 'visible',
-        }}
-      >
-        <TabDescription
-          description={tabDescription.text}
-          tooltipTitle={tabDescription.tooltip}
-        />
-      </Box>
-
-      <Box
-        sx={{
-          mt: 0,
-          p: 1,
-          bgcolor: alpha(theme.palette.primary.main, 0.04),
-          borderRadius: 2,
-        }}
-      >
-        <ProxyControlSwitches
-          onError={handleError}
-          label={
-            activeTab === 'system'
-              ? t('settings.sections.system.toggles.systemProxy')
-              : t('settings.sections.system.toggles.tunMode')
-          }
-          noRightPadding={true}
-        />
-      </Box>
-    </Box>
+    </Button>
   )
 }

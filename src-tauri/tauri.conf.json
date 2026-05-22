@@ -3,7 +3,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "active": true,
-    "longDescription": "Clash Verge Rev",
+    "longDescription": "PewPew云",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -12,11 +12,11 @@
       "icons/icon.ico"
     ],
     "resources": ["resources"],
-    "publisher": "Clash Verge Rev",
+    "publisher": "PewPew Cloud",
     "externalBin": ["sidecar/verge-mihomo", "sidecar/verge-mihomo-alpha"],
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",
-    "shortDescription": "Clash Verge Rev",
+    "shortDescription": "PewPew云",
     "createUpdaterArtifacts": true
   },
   "build": {
@@ -26,7 +26,8 @@
     "devUrl": "http://localhost:3000/",
     "removeUnusedCommands": true
   },
-  "productName": "Clash Verge",
+  "productName": "PewPew云",
+  "mainBinaryName": "pewpew-client",
   "identifier": "io.github.clash-verge-rev.clash-verge-rev",
   "plugins": {
     "updater": {

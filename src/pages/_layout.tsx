@@ -30,12 +30,9 @@ import { Outlet, useLocation, useNavigate } from 'react-router'
 
 import iconDark from '@/assets/image/icon_dark.svg?react'
 import iconLight from '@/assets/image/icon_light.svg?react'
-import LogoSvg from '@/assets/image/logo.svg?react'
 import { BaseErrorBoundary } from '@/components/base'
 import { LayoutItem } from '@/components/layout/layout-item'
-import { LayoutTraffic } from '@/components/layout/layout-traffic'
 import { NoticeManager } from '@/components/layout/notice-manager'
-import { UpdateButton } from '@/components/layout/update-button'
 import { WindowControls } from '@/components/layout/window-controller'
 import { useI18n } from '@/hooks/use-i18n'
 import { useVerge } from '@/hooks/use-verge'
@@ -51,7 +48,6 @@ import {
 } from './_layout/hooks'
 import { handleNoticeMessage } from './_layout/utils'
 import { navItems } from './_routers'
-import LogsPage from './logs'
 
 import 'dayjs/locale/ru'
 import 'dayjs/locale/zh-cn'
@@ -119,10 +115,8 @@ const Layout = () => {
   const navCollapsed = verge?.collapse_navbar ?? false
   const { switchLanguage } = useI18n()
   const navigate = useNavigate()
-  const { pathname } = useLocation()
-  const isLogsPage = pathname === '/logs'
+  useLocation()
   const logsPageMountedRef = useRef(false)
-  if (isLogsPage) logsPageMountedRef.current = true
   const themeReady = useMemo(() => Boolean(theme), [theme])
 
   const [menuUnlocked, setMenuUnlocked] = useState(false)
@@ -176,7 +170,6 @@ const Layout = () => {
     (event: React.MouseEvent<HTMLElement>) => {
       event.preventDefault()
       event.stopPropagation()
-      setMenuContextPosition({ top: event.clientY, left: event.clientX })
     },
     [],
   )
@@ -316,25 +309,37 @@ const Layout = () => {
               <div
                 data-tauri-drag-region="true"
                 style={{
-                  height: '27px',
+                  height: '38px',
                   display: 'flex',
-                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  gap: '8px',
                 }}
               >
                 <SvgIcon
                   component={isDark ? iconDark : iconLight}
                   style={{
-                    height: '36px',
-                    width: '36px',
-                    marginTop: '-3px',
-                    marginRight: '5px',
-                    marginLeft: '-3px',
+                    height: '32px',
+                    width: '32px',
+                    marginLeft: '-2px',
                   }}
                   inheritViewBox
                 />
-                <LogoSvg fill={isDark ? 'white' : 'black'} />
+                {!navCollapsed && (
+                  <Box
+                    component="span"
+                    sx={{
+                      color: isDark ? 'white' : 'black',
+                      fontSize: 16,
+                      fontWeight: 800,
+                      lineHeight: 1,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    PewPew 云
+                  </Box>
+                )}
               </div>
-              <UpdateButton className="the-newbtn" />
             </div>
 
             {menuUnlocked && (
@@ -444,9 +449,7 @@ const Layout = () => {
               </MenuItem>
             </Menu>
 
-            <div className="the-traffic">
-              <LayoutTraffic />
-            </div>
+            <div className="the-traffic" />
           </div>
 
           <div className="layout-content__right">
@@ -455,20 +458,7 @@ const Layout = () => {
               <BaseErrorBoundary>
                 <Outlet />
               </BaseErrorBoundary>
-              {logsPageMountedRef.current && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    display: isLogsPage ? undefined : 'none',
-                  }}
-                >
-                  <LogsPage />
-                </div>
-              )}
+              {logsPageMountedRef.current && null}
             </div>
           </div>
         </div>

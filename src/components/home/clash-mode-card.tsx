@@ -1,56 +1,44 @@
-import {
-  DirectionsRounded,
-  LanguageRounded,
-  MultipleStopRounded,
-} from '@mui/icons-material'
-import { Box, Paper, Stack, Typography } from '@mui/material'
+import { Box, Chip, Stack, Typography, alpha, useTheme } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
 import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
 import { useVerge } from '@/hooks/use-verge'
 import {
   useAppRefreshers,
   useClashConfigData,
-  useCoreDataStatus,
 } from '@/providers/app-data-context'
 import { patchClashMode } from '@/services/cmds'
-import type { TranslationKey } from '@/types/generated/i18n-keys'
 
 const CLASH_MODES = ['rule', 'global', 'direct'] as const
 type ClashMode = (typeof CLASH_MODES)[number]
+const VISIBLE_CLASH_MODES: ClashMode[] = ['rule', 'global']
 
 const isClashMode = (mode: string): mode is ClashMode =>
   (CLASH_MODES as readonly string[]).includes(mode)
 
-const MODE_META: Record<
-  ClashMode,
-  { label: TranslationKey; description: TranslationKey }
-> = {
+const MODE_META: Record<ClashMode, { label: string; description: string }> = {
   rule: {
-    label: 'home.components.clashMode.labels.rule',
-    description: 'home.components.clashMode.descriptions.rule',
+    label: '智能模式',
+    description: '按规则自动选择连接方式',
   },
   global: {
-    label: 'home.components.clashMode.labels.global',
-    description: 'home.components.clashMode.descriptions.global',
+    label: '全局模式',
+    description: '统一通过当前线路连接',
   },
   direct: {
-    label: 'home.components.clashMode.labels.direct',
-    description: 'home.components.clashMode.descriptions.direct',
+    label: '直连模式',
+    description: '直连模式',
   },
 }
 
 export const ClashModeCard = () => {
-  const { t } = useTranslation()
+  const theme = useTheme()
   const { verge } = useVerge()
   const { clashConfig } = useClashConfigData()
-  const { isCoreDataPending } = useCoreDataStatus()
   const { refreshClashConfig } = useAppRefreshers()
 
   // 支持的模式列表
-  const modeList = CLASH_MODES
+  const modeList = VISIBLE_CLASH_MODES
 
   // 直接使用API返回的模式，不维护本地状态
   const currentMode = clashConfig?.mode?.toLowerCase()
@@ -58,26 +46,8 @@ export const ClashModeCard = () => {
     typeof currentMode === 'string' && isClashMode(currentMode)
       ? currentMode
       : undefined
-
-  const modeDescription = useMemo(() => {
-    if (currentModeKey) {
-      return t(MODE_META[currentModeKey].description)
-    }
-    if (isCoreDataPending) {
-      return '\u00A0'
-    }
-    return t('home.components.clashMode.errors.communication')
-  }, [currentModeKey, isCoreDataPending, t])
-
-  // 模式图标映射
-  const modeIcons = useMemo(
-    () => ({
-      rule: <MultipleStopRounded fontSize="small" />,
-      global: <LanguageRounded fontSize="small" />,
-      direct: <DirectionsRounded fontSize="small" />,
-    }),
-    [],
-  )
+  const visibleModeKey =
+    currentModeKey === 'direct' ? undefined : currentModeKey
 
   // 切换模式的处理函数
   const onChangeMode = useLockFn(async (mode: ClashMode) => {
@@ -98,105 +68,101 @@ export const ClashModeCard = () => {
   // 按钮样式
   const buttonStyles = (mode: ClashMode) => ({
     cursor: 'pointer',
-    px: 2,
-    py: 1.2,
+    px: 1.5,
+    py: 1,
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 1,
-    bgcolor: mode === currentModeKey ? 'primary.main' : 'background.paper',
-    color: mode === currentModeKey ? 'primary.contrastText' : 'text.primary',
-    borderRadius: 1.5,
+    gap: 0.45,
+    minHeight: 72,
+    minWidth: 0,
+    boxSizing: 'border-box',
+    bgcolor:
+      mode === visibleModeKey
+        ? 'primary.main'
+        : alpha(theme.palette.primary.main, 0.055),
+    color: mode === visibleModeKey ? 'primary.contrastText' : 'text.primary',
+    border: `1px solid ${
+      mode === visibleModeKey
+        ? alpha(theme.palette.primary.main, 0.1)
+        : alpha(theme.palette.primary.main, 0.08)
+    }`,
+    borderRadius: 3,
     transition: 'all 0.2s ease-in-out',
     position: 'relative',
-    overflow: 'visible',
+    overflow: 'hidden',
     '&:hover': {
       transform: 'translateY(-1px)',
-      boxShadow: 1,
+      bgcolor:
+        mode === visibleModeKey
+          ? 'primary.dark'
+          : alpha(theme.palette.primary.main, 0.09),
     },
     '&:active': {
       transform: 'translateY(1px)',
     },
-    '&::after':
-      mode === currentModeKey
-        ? {
-            content: '""',
-            position: 'absolute',
-            bottom: -16,
-            left: '50%',
-            width: 2,
-            height: 16,
-            bgcolor: 'primary.main',
-            transform: 'translateX(-50%)',
-          }
-        : {},
   })
 
-  // 描述样式
-  const descriptionStyles = {
-    width: '95%',
-    textAlign: 'center',
-    color: 'text.secondary',
-    p: 0.8,
-    borderRadius: 1,
-    borderColor: 'primary.main',
-    borderWidth: 1,
-    borderStyle: 'solid',
-    backgroundColor: 'background.paper',
-    wordBreak: 'break-word',
-    hyphens: 'auto',
-  }
-
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-      {/* 模式选择按钮组 */}
-      <Stack
-        direction="row"
-        spacing={1}
+    <Stack spacing={1.25} sx={{ width: '100%', minWidth: 0 }}>
+      <Box
         sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          py: 1,
-          position: 'relative',
-          zIndex: 2,
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+          gap: 1,
+          width: '100%',
+          minWidth: 0,
         }}
       >
         {modeList.map((mode) => (
-          <Paper
+          <Box
             key={mode}
-            elevation={mode === currentModeKey ? 2 : 0}
+            role="button"
+            tabIndex={0}
             onClick={() => onChangeMode(mode)}
             sx={buttonStyles(mode)}
           >
-            {modeIcons[mode]}
+            <Stack
+              direction="row"
+              spacing={0.75}
+              sx={{ alignItems: 'center', minWidth: 0 }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 850 }} noWrap>
+                {MODE_META[mode].label}
+              </Typography>
+              {mode === 'rule' && (
+                <Chip
+                  size="small"
+                  label="推荐"
+                  sx={{
+                    height: 20,
+                    fontSize: 11,
+                    bgcolor:
+                      mode === visibleModeKey
+                        ? alpha(theme.palette.common.white, 0.18)
+                        : alpha(theme.palette.success.main, 0.12),
+                    color:
+                      mode === visibleModeKey
+                        ? 'inherit'
+                        : theme.palette.success.main,
+                  }}
+                />
+              )}
+            </Stack>
             <Typography
-              variant="body2"
+              variant="caption"
               sx={{
-                textTransform: 'capitalize',
-                fontWeight: mode === currentModeKey ? 600 : 400,
+                opacity: mode === visibleModeKey ? 0.9 : 0.72,
+                textAlign: 'center',
+                lineHeight: 1.3,
               }}
             >
-              {t(MODE_META[mode].label)}
+              {MODE_META[mode].description}
             </Typography>
-          </Paper>
+          </Box>
         ))}
-      </Stack>
-
-      {/* 说明文本区域 */}
-      <Box
-        sx={{
-          width: '100%',
-          my: 1,
-          position: 'relative',
-          display: 'flex',
-          justifyContent: 'center',
-          overflow: 'visible',
-        }}
-      >
-        <Typography variant="caption" component="div" sx={descriptionStyles}>
-          {modeDescription}
-        </Typography>
       </Box>
-    </Box>
+    </Stack>
   )
 }

@@ -1,112 +1,84 @@
-import { GitHub, HelpOutlineRounded, Telegram } from '@mui/icons-material'
-import { Box, ButtonGroup, IconButton, Grid } from '@mui/material'
-import { useLockFn } from 'ahooks'
-import { useTranslation } from 'react-i18next'
+import { ArrowBackRounded } from '@mui/icons-material'
+import { Box, Button, Stack, Typography } from '@mui/material'
+import { Link as RouterLink } from 'react-router'
 
 import { BasePage } from '@/components/base'
-import SettingClash from '@/components/setting/setting-clash'
-import SettingSystem from '@/components/setting/setting-system'
-import SettingVergeAdvanced from '@/components/setting/setting-verge-advanced'
-import SettingVergeBasic from '@/components/setting/setting-verge-basic'
-import { openWebUrl } from '@/services/cmds'
-import { showNotice } from '@/services/notice-service'
-import { useThemeMode } from '@/services/states'
 
 const SettingPage = () => {
-  const { t } = useTranslation()
-
-  const onError = (err: any) => {
-    showNotice.error(err)
-  }
-
-  const toGithubRepo = useLockFn(() => {
-    return openWebUrl('https://github.com/clash-verge-rev/clash-verge-rev')
-  })
-
-  const toGithubDoc = useLockFn(() => {
-    return openWebUrl('https://clash-verge-rev.github.io/index.html')
-  })
-
-  const toTelegramChannel = useLockFn(() => {
-    return openWebUrl('https://t.me/clash_verge_re')
-  })
-
-  const mode = useThemeMode()
-  const isDark = mode === 'light' ? false : true
-
   return (
     <BasePage
-      title={t('settings.page.title')}
+      title="关于 / 开源许可"
       header={
-        <ButtonGroup variant="contained" aria-label="Basic button group">
-          <IconButton
-            size="medium"
-            color="inherit"
-            title={t('settings.page.actions.manual')}
-            onClick={toGithubDoc}
-          >
-            <HelpOutlineRounded fontSize="inherit" />
-          </IconButton>
-          <IconButton
-            size="medium"
-            color="inherit"
-            title={t('settings.page.actions.telegram')}
-            onClick={toTelegramChannel}
-          >
-            <Telegram fontSize="inherit" />
-          </IconButton>
-
-          <IconButton
-            size="medium"
-            color="inherit"
-            title={t('settings.page.actions.github')}
-            onClick={toGithubRepo}
-          >
-            <GitHub fontSize="inherit" />
-          </IconButton>
-        </ButtonGroup>
+        <Button
+          component={RouterLink}
+          to="/"
+          size="small"
+          startIcon={<ArrowBackRounded />}
+          sx={{ borderRadius: 999 }}
+        >
+          返回首页
+        </Button>
       }
+      contentStyle={{ padding: 2 }}
     >
-      <Grid container spacing={1.5} columns={{ xs: 6, sm: 6, md: 12 }}>
-        <Grid size={6}>
-          <Box
-            sx={{
-              borderRadius: 2,
-              marginBottom: 1.5,
-              backgroundColor: isDark ? '#282a36' : '#ffffff',
-            }}
-          >
-            <SettingSystem onError={onError} />
+      <Box
+        sx={(theme) => ({
+          maxWidth: 760,
+          borderRadius: 1,
+          border: `1px solid ${theme.palette.divider}`,
+          bgcolor:
+            theme.palette.mode === 'light'
+              ? 'rgba(255,255,255,0.92)'
+              : 'rgba(36,37,47,0.92)',
+          p: 2.5,
+        })}
+      >
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.75 }}>
+              PewPew 云客户端
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              本客户端用于导入 PewPew 云订阅、选择节点并开启 PewPew 云网络开关。
+            </Typography>
           </Box>
-          <Box
-            sx={{
-              borderRadius: 2,
-              backgroundColor: isDark ? '#282a36' : '#ffffff',
-            }}
-          >
-            <SettingClash onError={onError} />
+
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.75 }}>
+              开源许可
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              本客户端遵守 GPL-3.0 开源许可。
+            </Typography>
           </Box>
-        </Grid>
-        <Grid size={6}>
-          <Box
-            sx={{
-              borderRadius: 2,
-              marginBottom: 1.5,
-              backgroundColor: isDark ? '#282a36' : '#ffffff',
-            }}
-          >
-            <SettingVergeBasic onError={onError} />
+
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.75 }}>
+              上游致谢
+            </Typography>
+            <Stack spacing={0.5}>
+              <Typography variant="body2" color="text.secondary">
+                PewPew 云客户端基于 Clash Verge Rev、mihomo / Clash.Meta、Tauri
+                构建。
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Clash Verge Rev:
+                https://github.com/clash-verge-rev/clash-verge-rev
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                mihomo / Clash.Meta: https://github.com/MetaCubeX/mihomo
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Tauri: https://tauri.app/
+              </Typography>
+            </Stack>
           </Box>
-          <Box
-            sx={{
-              borderRadius: 2,
-              backgroundColor: isDark ? '#282a36' : '#ffffff',
-            }}
-          >
-            <SettingVergeAdvanced onError={onError} />
-          </Box>
-        </Grid>
-      </Grid>
+
+          <Typography variant="caption" color="text.secondary">
+            客服微信：PewPew_VPN
+          </Typography>
+        </Stack>
+      </Box>
     </BasePage>
   )
 }

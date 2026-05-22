@@ -1,389 +1,236 @@
-import {
-  CloudUploadOutlined,
-  DnsOutlined,
-  EventOutlined,
-  LaunchOutlined,
-  SpeedOutlined,
-  StorageOutlined,
-  UpdateOutlined,
-} from '@mui/icons-material'
+import { CloudUploadOutlined, UpdateOutlined } from '@mui/icons-material'
 import {
   Box,
   Button,
-  LinearProgress,
-  Link,
+  Paper,
   Stack,
+  TextField,
   Typography,
   alpha,
-  keyframes,
-  useTheme,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
-import { useCallback, useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
+import { useMemo, useState } from 'react'
 
+import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
 import { useAppRefreshers } from '@/providers/app-data-context'
-import { openWebUrl, updateProfile } from '@/services/cmds'
+import { enhanceProfiles, importProfile, updateProfile } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
-import parseTraffic from '@/utils/parse-traffic'
-
-import { EnhancedCard } from './enhanced-card'
-
-// 定义旋转动画
-const round = keyframes`
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-`
-
-// 辅助函数解析URL和过期时间
-const parseUrl = (url?: string) => {
-  if (!url) return '-'
-  if (url.startsWith('http')) return new URL(url).host
-  return 'local'
-}
-
-const parseExpire = (expire?: number) => {
-  if (!expire) return '-'
-  return dayjs(expire * 1000).format('YYYY-MM-DD')
-}
-
-// 使用类型定义，而不是导入
-interface ProfileExtra {
-  upload: number
-  download: number
-  total: number
-  expire: number
-}
-
-interface ProfileItem {
-  uid: string
-  type?: 'local' | 'remote' | 'merge' | 'script'
-  name?: string
-  desc?: string
-  file?: string
-  url?: string
-  updated?: number
-  extra?: ProfileExtra
-  home?: string
-  option?: any
-}
 
 interface HomeProfileCardProps {
-  current: ProfileItem | null | undefined
-  onProfileUpdated?: () => void
+  current: IProfileItem | null | undefined
+  onProfileUpdated?: () => void | Promise<void>
+  onSyncingChange?: (syncing: boolean) => void
 }
 
-// 提取独立组件减少主组件复杂度
-const ProfileDetails = ({
-  current,
-  onUpdateProfile,
-  updating,
-}: {
-  current: ProfileItem
-  onUpdateProfile: () => void
-  updating: boolean
-}) => {
-  const { t } = useTranslation()
-  const theme = useTheme()
-
-  const usedTraffic = useMemo(() => {
-    if (!current.extra) return 0
-    return current.extra.upload + current.extra.download
-  }, [current.extra])
-
-  const trafficPercentage = useMemo(() => {
-    if (!current.extra || !current.extra.total || current.extra.total <= 0)
-      return 0
-    return Math.min(Math.round((usedTraffic / current.extra.total) * 100), 100)
-  }, [current.extra, usedTraffic])
-
-  return (
-    <Box>
-      <Stack spacing={2}>
-        {current.url && (
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <DnsOutlined fontSize="small" color="action" />
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              noWrap
-              sx={{ display: 'flex', alignItems: 'center' }}
-            >
-              <span style={{ flexShrink: 0 }}>{t('shared.labels.from')}: </span>
-              {current.home ? (
-                <Link
-                  component="button"
-                  onClick={() => current.home && openWebUrl(current.home)}
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    minWidth: 0,
-                    maxWidth: 'calc(100% - 40px)',
-                    ml: 0.5,
-                    fontWeight: 'medium',
-                  }}
-                  title={parseUrl(current.url)}
-                >
-                  <Typography
-                    component="span"
-                    sx={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      minWidth: 0,
-                      flex: 1,
-                    }}
-                  >
-                    {parseUrl(current.url)}
-                  </Typography>
-                  <LaunchOutlined
-                    fontSize="inherit"
-                    sx={{
-                      ml: 0.5,
-                      fontSize: '0.8rem',
-                      opacity: 0.7,
-                      flexShrink: 0,
-                    }}
-                  />
-                </Link>
-              ) : (
-                <Typography
-                  component="span"
-                  sx={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    minWidth: 0,
-                    flex: 1,
-                    ml: 0.5,
-                    fontWeight: 'medium',
-                  }}
-                  title={parseUrl(current.url)}
-                >
-                  {parseUrl(current.url)}
-                </Typography>
-              )}
-            </Typography>
-          </Stack>
-        )}
-
-        {current.updated && (
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <UpdateOutlined
-              fontSize="small"
-              color="action"
-              sx={{
-                cursor: 'pointer',
-                animation: updating ? `${round} 1.5s linear infinite` : 'none',
-              }}
-              onClick={onUpdateProfile}
-            />
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ cursor: 'pointer' }}
-              onClick={onUpdateProfile}
-            >
-              {t('shared.labels.updateTime')}:{' '}
-              <Box component="span" sx={{ fontWeight: 'medium' }}>
-                {dayjs(current.updated * 1000).format('YYYY-MM-DD HH:mm')}
-              </Box>
-            </Typography>
-          </Stack>
-        )}
-
-        {current.extra && (
-          <>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <SpeedOutlined fontSize="small" color="action" />
-              <Typography variant="body2" color="text.secondary">
-                {t('shared.labels.usedTotal')}:{' '}
-                <Box component="span" sx={{ fontWeight: 'medium' }}>
-                  {parseTraffic(usedTraffic)} /{' '}
-                  {parseTraffic(current.extra.total)}
-                </Box>
-              </Typography>
-            </Stack>
-
-            {current.extra.expire > 0 && (
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <EventOutlined fontSize="small" color="action" />
-                <Typography variant="body2" color="text.secondary">
-                  {t('shared.labels.expireTime')}:{' '}
-                  <Box component="span" sx={{ fontWeight: 'medium' }}>
-                    {parseExpire(current.extra.expire)}
-                  </Box>
-                </Typography>
-              </Stack>
-            )}
-
-            <Box sx={{ mt: 1 }}>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mb: 0.5, display: 'block' }}
-              >
-                {trafficPercentage}%
-              </Typography>
-              <LinearProgress
-                variant="determinate"
-                value={trafficPercentage}
-                sx={{
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.12),
-                }}
-              />
-            </Box>
-          </>
-        )}
-      </Stack>
-    </Box>
-  )
-}
-
-// 提取空配置组件
-const EmptyProfile = ({ onClick }: { onClick: () => void }) => {
-  const { t } = useTranslation()
-
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        py: 2.4,
-        cursor: 'pointer',
-        '&:hover': { bgcolor: 'action.hover' },
-        borderRadius: 2,
-      }}
-      onClick={onClick}
-    >
-      <CloudUploadOutlined
-        sx={{ fontSize: 60, color: 'primary.main', mb: 2 }}
-      />
-      <Typography variant="h6" gutterBottom>
-        {t('profiles.page.actions.import')} {t('profiles.page.title')}
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        {t('profiles.components.card.labels.clickToImport')}
-      </Typography>
-    </Box>
-  )
-}
+const isSubscriptionUrl = (value: string) => /^https?:\/\//i.test(value)
 
 export const HomeProfileCard = ({
   current,
   onProfileUpdated,
+  onSyncingChange,
 }: HomeProfileCardProps) => {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
   const { refreshAll } = useAppRefreshers()
+  const {
+    indicator: networkEnabled,
+    configState: networkConfigEnabled,
+    setSystemProxyEnabled,
+    invalidateProxyState,
+  } = useSystemProxyState()
+  const [subscriptionUrl, setSubscriptionUrl] = useState('')
+  const [statusText, setStatusText] = useState('')
+  const [syncing, setSyncing] = useState(false)
 
-  // 更新当前订阅
-  const [updating, setUpdating] = useState(false)
+  const currentStatus = useMemo(() => {
+    if (!current) return '尚未导入线路'
 
-  const onUpdateProfile = useLockFn(async () => {
-    if (!current?.uid) return
+    const updated = current.updated
+      ? `上次更新时间：${dayjs(current.updated * 1000).format('YYYY-MM-DD HH:mm')}`
+      : ''
 
-    setUpdating(true)
+    return updated || '当前状态：线路订阅已导入'
+  }, [current])
+
+  const setSyncingState = (value: boolean) => {
+    setSyncing(value)
+    onSyncingChange?.(value)
+  }
+
+  const refreshSubscription = async () => {
+    await onProfileUpdated?.()
+    const enhanced = await enhanceProfiles()
+    if (!enhanced) {
+      throw new Error('线路配置校验失败，请检查订阅链接或联系客服')
+    }
+    await onProfileUpdated?.()
+    await refreshAll()
+  }
+
+  const closeNetworkBeforeSync = async () => {
+    if (!networkEnabled && !networkConfigEnabled) return false
+
+    setStatusText('已临时关闭 PewPew 云，正在更新线路...')
+    await setSystemProxyEnabled(false)
+    await invalidateProxyState()
+    return true
+  }
+
+  const importLineWithFallback = async (url: string) => {
     try {
-      await updateProfile(current.uid, current.option)
-      onProfileUpdated?.()
+      await importProfile(url)
+    } catch (firstError) {
+      console.warn('[PewPew] 线路导入失败，尝试备用方式:', firstError)
+      await importProfile(url, {
+        with_proxy: false,
+        self_proxy: true,
+      })
+    }
+  }
 
-      // 刷新首页数据
-      refreshAll()
+  const handleImport = useLockFn(async () => {
+    const url = subscriptionUrl.trim()
+
+    if (!url) {
+      setStatusText('请先粘贴订阅链接')
+      return
+    }
+
+    if (!isSubscriptionUrl(url)) {
+      setStatusText('订阅链接需要以 http:// 或 https:// 开头')
+      return
+    }
+
+    setSyncingState(true)
+
+    try {
+      const closedNetwork = await closeNetworkBeforeSync()
+      setStatusText(
+        closedNetwork
+          ? '已临时关闭 PewPew 云，正在更新线路...'
+          : '正在导入线路...',
+      )
+      await importLineWithFallback(url)
+      await refreshSubscription()
+      setSubscriptionUrl('')
+      setStatusText('线路导入成功，请点击“开启 PewPew 云”开始使用')
+      showNotice.success('线路导入成功')
     } catch (err) {
-      showNotice.error(err, 3000)
+      console.error('[PewPew] 线路导入失败:', err)
+      setStatusText('线路导入失败，请检查订阅链接或联系客服')
+      showNotice.error(err)
     } finally {
-      setUpdating(false)
+      setSyncingState(false)
     }
   })
 
-  // 导航到订阅页面
-  const goToProfiles = useCallback(() => {
-    navigate('/profile')
-  }, [navigate])
+  const handleUpdate = useLockFn(async () => {
+    if (!current?.uid) {
+      setStatusText('请先导入订阅链接')
+      return
+    }
 
-  // 卡片标题
-  const cardTitle = useMemo(() => {
-    if (!current) return t('profiles.page.title')
+    setSyncingState(true)
 
-    if (!current.home) return current.name
+    try {
+      const closedNetwork = await closeNetworkBeforeSync()
+      setStatusText(
+        closedNetwork
+          ? '已临时关闭 PewPew 云，正在更新线路...'
+          : '正在更新线路...',
+      )
+      await updateProfile(current.uid, current.option)
+      await refreshSubscription()
+      setStatusText('线路更新成功，请点击“开启 PewPew 云”开始使用')
+      showNotice.success('线路更新成功')
+    } catch (err) {
+      console.error('[PewPew] 线路更新失败:', err)
+      setStatusText('线路更新失败，请检查订阅链接或联系客服')
+      showNotice.error(err)
+    } finally {
+      setSyncingState(false)
+    }
+  })
 
-    return (
-      <Link
-        component="button"
-        variant="h6"
-        onClick={() => current.home && openWebUrl(current.home)}
-        sx={{
-          color: 'inherit',
-          textDecoration: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          minWidth: 0,
-          maxWidth: '100%',
-          fontWeight: 'medium',
-          fontSize: 18,
-          '& > span': {
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            flex: 1,
-          },
-        }}
-        title={current.name}
-      >
-        <span>{current.name}</span>
-        <LaunchOutlined
-          fontSize="inherit"
-          sx={{
-            ml: 0.5,
-            fontSize: '0.8rem',
-            opacity: 0.7,
-            flexShrink: 0,
-          }}
-        />
-      </Link>
-    )
-  }, [current, t])
-
-  // 卡片操作按钮
-  const cardAction = useMemo(() => {
-    if (!current) return null
-
-    return (
-      <Button
-        variant="outlined"
-        size="small"
-        onClick={goToProfiles}
-        endIcon={<StorageOutlined fontSize="small" />}
-        sx={{ borderRadius: 1.5 }}
-      >
-        {t('layout.components.navigation.tabs.profiles')}
-      </Button>
-    )
-  }, [current, goToProfiles, t])
+  const canImport = subscriptionUrl.trim().length > 0
 
   return (
-    <EnhancedCard
-      title={cardTitle}
-      icon={<CloudUploadOutlined />}
-      iconColor="info"
-      action={cardAction}
+    <Paper
+      elevation={0}
+      sx={(theme) => ({
+        borderRadius: 4,
+        p: { xs: 2, md: 2.5 },
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        bgcolor:
+          theme.palette.mode === 'light'
+            ? alpha(theme.palette.common.white, 0.72)
+            : alpha(theme.palette.background.paper, 0.78),
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.08)}`,
+        boxShadow:
+          theme.palette.mode === 'light'
+            ? '0 12px 34px rgba(40, 70, 120, 0.06)'
+            : '0 12px 34px rgba(0, 0, 0, 0.18)',
+      })}
     >
-      {current ? (
-        <ProfileDetails
-          current={current}
-          onUpdateProfile={onUpdateProfile}
-          updating={updating}
+      <Stack spacing={1.5}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h6" sx={{ fontWeight: 850 }}>
+              线路订阅
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              粘贴链接后导入或更新线路
+            </Typography>
+          </Box>
+        </Stack>
+
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="粘贴订阅链接"
+          value={subscriptionUrl}
+          onChange={(event) => setSubscriptionUrl(event.target.value)}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2.5,
+              bgcolor: 'background.paper',
+            },
+          }}
         />
-      ) : (
-        <EmptyProfile onClick={goToProfiles} />
-      )}
-    </EnhancedCard>
+
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={handleImport}
+            disabled={!canImport || syncing}
+            startIcon={<CloudUploadOutlined />}
+            sx={{ borderRadius: 999, py: 1 }}
+          >
+            导入线路
+          </Button>
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={handleUpdate}
+            disabled={!current?.uid || syncing}
+            startIcon={<UpdateOutlined />}
+            sx={{ borderRadius: 999, py: 1 }}
+          >
+            更新线路
+          </Button>
+        </Stack>
+
+        <Box>
+          <Typography variant="body2" color="text.secondary">
+            {statusText || currentStatus}
+          </Typography>
+        </Box>
+      </Stack>
+    </Paper>
   )
 }

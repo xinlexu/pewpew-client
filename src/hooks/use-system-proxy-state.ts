@@ -44,7 +44,7 @@ export const useSystemProxyState = () => {
   const pendingRef = useRef<boolean | null>(null)
   const busyRef = useRef(false)
 
-  const toggleSystemProxy = async (enabled: boolean) => {
+  const setSystemProxyEnabled = async (enabled: boolean) => {
     mutateVerge(
       (prev) => (prev ? { ...prev, enable_system_proxy: enabled } : prev),
       false,
@@ -81,7 +81,8 @@ export const useSystemProxyState = () => {
   return {
     indicator,
     configState: enable_system_proxy ?? false,
-    toggleSystemProxy,
+    setSystemProxyEnabled,
+    toggleSystemProxy: setSystemProxyEnabled,
     invalidateProxyState,
   }
 }
