@@ -63,8 +63,11 @@ import type { ClientLanguageMode } from '@/services/i18n'
 import { getCachedClientLanguageMode } from '@/services/i18n'
 import { showNotice } from '@/services/notice-service'
 import {
+  PEWPEW_LAST_YAML_PROFILE_KEY,
   PEWPEW_UNKNOWN_STATUS,
+  PewPewAccountEvaluation,
   PewPewSubscriptionStatus,
+  evaluatePewPewAccountState,
   extractPewPewSubscriptionStatus,
   resolvePewPewProxyGroup,
 } from '@/utils/pewpew-client'
@@ -83,6 +86,39 @@ const writeAutoUpdateRoutesOnStartup = (enabled: boolean) => {
 const getReadableError = (error: unknown) => {
   if (error instanceof Error) return error.message
   if (typeof error === 'string') return error
+  return ''
+}
+
+const getProfileDiagnosticsType = (profile?: IProfileItem | null) => {
+  if (!profile?.uid) return 'unknown'
+  if (profile.type === 'remote') return 'remote-subscription'
+  if (profile.type === 'local') return 'local-yaml'
+  return 'unknown'
+}
+
+const getAccountBlockedText = (
+  evaluation: PewPewAccountEvaluation,
+  t: (key: string) => string,
+) => {
+  if (evaluation.blockReason === 'expired') {
+    return t('home.pewpew.account.planExpiredShort')
+  }
+  if (evaluation.blockReason === 'dataExhausted') {
+    return t('home.pewpew.account.dataExhaustedShort')
+  }
+  return ''
+}
+
+const getAccountBlockedContinueText = (
+  evaluation: PewPewAccountEvaluation,
+  t: (key: string) => string,
+) => {
+  if (evaluation.blockReason === 'expired') {
+    return t('home.pewpew.account.planExpiredContinue')
+  }
+  if (evaluation.blockReason === 'dataExhausted') {
+    return t('home.pewpew.account.dataExhaustedContinue')
+  }
   return ''
 }
 
@@ -111,6 +147,10 @@ const HomePage = () => {
   const subscriptionCardRef = useRef<HTMLDivElement | null>(null)
   const startupUpdateRanRef = useRef(false)
   const subscriptionStatus = extractPewPewSubscriptionStatus(current, proxies)
+  const accountEvaluation = useMemo(
+    () => evaluatePewPewAccountState(subscriptionStatus),
+    [subscriptionStatus],
+  )
   const isDark = theme.palette.mode === 'dark'
   const proxyGroupResult = useMemo(
     () => resolvePewPewProxyGroup(proxies),
@@ -118,6 +158,8 @@ const HomePage = () => {
   )
 
   const currentLineSummary = (() => {
+    if (lineSyncing) return { name: '', delayText: '' }
+
     const { group, options } = proxyGroupResult
     if (!group?.now) return { name: '', delayText: '' }
 
@@ -140,6 +182,11 @@ const HomePage = () => {
     return { name: currentLine.name, delayText }
   })()
   const hasUsableRoutes = proxyGroupResult.options.length > 0
+  const accountBlockedText = getAccountBlockedText(accountEvaluation, t)
+  const accountBlockedContinueText = getAccountBlockedContinueText(
+    accountEvaluation,
+    t,
+  )
 
   const handleDelayUpdated = useCallback(() => {
     refreshDelaySummary()
@@ -169,6 +216,9 @@ const HomePage = () => {
       const hasSubscriptionStatus = Object.values(subscriptionStatus).some(
         (value) => value !== PEWPEW_UNKNOWN_STATUS,
       )
+      const lastYamlProfileUid = localStorage.getItem(
+        PEWPEW_LAST_YAML_PROFILE_KEY,
+      )
       const diagnostics = [
         'PewPew Cloud Client Diagnostics',
         `Version: ${appVersion}`,
@@ -186,6 +236,18 @@ const HomePage = () => {
         `Last connection error: ${lastConnectionError || 'none'}`,
         `Has usable routes: ${hasUsableRoutes ? 'yes' : 'no'}`,
         `Has subscription status: ${hasSubscriptionStatus ? 'yes' : 'no'}`,
+        `Profile type: ${getProfileDiagnosticsType(current)}`,
+        `Current profile just imported YAML: ${
+          current?.uid && lastYamlProfileUid === current.uid ? 'yes' : 'no'
+        }`,
+        `Account state: ${accountEvaluation.state}`,
+        `Blocked by expired plan: ${accountEvaluation.expired ? 'yes' : 'no'}`,
+        `Blocked by exhausted data: ${
+          accountEvaluation.dataExhausted ? 'yes' : 'no'
+        }`,
+        `Route count: ${proxyGroupResult.options.length}`,
+        `Filtered informational items: ${proxyGroupResult.filteredInfoCount}`,
+        `Main proxy group: ${proxyGroupResult.group?.name || 'none'}`,
         `Generated at: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
       ].join('\n')
 
@@ -203,11 +265,15 @@ const HomePage = () => {
   }, [
     clashConfig?.mode,
     connectionEnabled,
-    current?.updated,
+    current,
     currentLineSummary.name,
     hasUsableRoutes,
     i18n.language,
     lastConnectionError,
+    accountEvaluation,
+    proxyGroupResult.filteredInfoCount,
+    proxyGroupResult.group?.name,
+    proxyGroupResult.options.length,
     subscriptionStatus,
     t,
     theme.palette.mode,
@@ -345,6 +411,9 @@ const HomePage = () => {
 
         <MainConnectPanel
           currentLine={currentLineSummary}
+          accountBlockedContinueText={accountBlockedContinueText}
+          accountEvaluation={accountEvaluation}
+          accountBlockedText={accountBlockedText}
           disabled={lineSyncing}
           hasRoute={hasUsableRoutes}
           onConnectionError={setLastConnectionError}
@@ -354,11 +423,15 @@ const HomePage = () => {
           status={subscriptionStatus}
         />
 
-        {!hasUsableRoutes && (
+        {!hasUsableRoutes && !accountEvaluation.blocked && (
           <GettingStartedCard onImportRoutes={handleImportGuide} />
         )}
 
-        <ConnectionSettingsCard onDelayUpdated={handleDelayUpdated} />
+        <ConnectionSettingsCard
+          accountEvaluation={accountEvaluation}
+          accountBlockedText={accountBlockedText}
+          onDelayUpdated={handleDelayUpdated}
+        />
 
         <Box ref={subscriptionCardRef}>
           <HomeProfileCard
@@ -423,10 +496,11 @@ const PewPewHeader = ({
           alt="PewPew 云"
           data-tauri-drag-region="false"
           sx={{
-            width: { xs: 150, sm: 180 },
-            height: 54,
-            objectFit: 'contain',
-            objectPosition: 'left center',
+            width: { xs: 54, sm: 58 },
+            height: { xs: 54, sm: 58 },
+            objectFit: 'cover',
+            objectPosition: 'center',
+            borderRadius: 2.5,
             flexShrink: 0,
           }}
         />
@@ -561,6 +635,9 @@ const WeChatIcon = () => {
 }
 
 const MainConnectPanel = ({
+  accountBlockedContinueText,
+  accountBlockedText,
+  accountEvaluation,
   currentLine,
   disabled,
   hasRoute,
@@ -570,6 +647,9 @@ const MainConnectPanel = ({
   repairing,
   status,
 }: {
+  accountBlockedContinueText: string
+  accountBlockedText: string
+  accountEvaluation: PewPewAccountEvaluation
   currentLine: { name: string; delayText: string }
   disabled: boolean
   hasRoute: boolean
@@ -600,6 +680,8 @@ const MainConnectPanel = ({
       <Stack spacing={2} sx={{ alignItems: 'center', minWidth: 0 }}>
         <Box sx={{ width: '100%', maxWidth: 440 }}>
           <ProxyTunCard
+            connectionBlocked={accountEvaluation.blocked}
+            connectionBlockedText={accountBlockedContinueText}
             disabled={disabled}
             hasRoute={hasRoute}
             onConnectionError={onConnectionError}
@@ -609,28 +691,41 @@ const MainConnectPanel = ({
           />
         </Box>
 
-        <LineSummaryChip currentLine={currentLine} />
+        <LineSummaryChip
+          accountEvaluation={accountEvaluation}
+          blockedText={accountBlockedText}
+          currentLine={currentLine}
+        />
 
-        <SubscriptionStatusCard status={status} />
+        <SubscriptionStatusCard
+          accountEvaluation={accountEvaluation}
+          status={status}
+        />
       </Stack>
     </Paper>
   )
 }
 
 const LineSummaryChip = ({
+  accountEvaluation,
+  blockedText,
   currentLine,
 }: {
+  accountEvaluation: PewPewAccountEvaluation
+  blockedText: string
   currentLine: { name: string; delayText: string }
 }) => {
   const { t } = useTranslation()
-  const text = !currentLine.name
-    ? t('home.pewpew.switch.currentRouteEmpty')
-    : currentLine.delayText
-      ? t('home.pewpew.switch.currentRouteWithDelay', {
-          name: currentLine.name,
-          delay: currentLine.delayText,
-        })
-      : t('home.pewpew.switch.currentRoute', { name: currentLine.name })
+  const text = accountEvaluation.blocked
+    ? blockedText
+    : !currentLine.name
+      ? t('home.pewpew.switch.currentRouteEmpty')
+      : currentLine.delayText
+        ? t('home.pewpew.switch.currentRouteWithDelay', {
+            name: currentLine.name,
+            delay: currentLine.delayText,
+          })
+        : t('home.pewpew.switch.currentRoute', { name: currentLine.name })
 
   return (
     <Box
@@ -643,9 +738,22 @@ const LineSummaryChip = ({
         color: theme.palette.text.primary,
         bgcolor:
           theme.palette.mode === 'light'
-            ? alpha(PEWPEW_BLUE, 0.075)
-            : alpha(PEWPEW_BLUE, 0.16),
-        border: `1px solid ${alpha(PEWPEW_BLUE, 0.1)}`,
+            ? alpha(
+                accountEvaluation.blocked
+                  ? theme.palette.error.main
+                  : PEWPEW_BLUE,
+                0.075,
+              )
+            : alpha(
+                accountEvaluation.blocked
+                  ? theme.palette.error.main
+                  : PEWPEW_BLUE,
+                0.16,
+              ),
+        border: `1px solid ${alpha(
+          accountEvaluation.blocked ? theme.palette.error.main : PEWPEW_BLUE,
+          0.14,
+        )}`,
       })}
     >
       <Typography
@@ -662,86 +770,42 @@ const LineSummaryChip = ({
   )
 }
 
-const getExpireAlert = (value: string) => {
-  const expireDate = dayjs(value)
-  if (!expireDate.isValid()) return null
-
-  const today = dayjs().startOf('day')
-  const expireEnd = expireDate.endOf('day')
-
-  if (expireEnd.isBefore(today)) {
-    return { severity: 'error' as const, key: 'home.pewpew.account.expired' }
-  }
-
-  if (expireDate.startOf('day').diff(today, 'day') <= 7) {
-    return {
-      severity: 'warning' as const,
-      key: 'home.pewpew.account.expiringSoon',
-    }
-  }
-
-  return null
-}
-
-const parseTrafficToGb = (value: string) => {
-  if (!value || value === PEWPEW_UNKNOWN_STATUS) return null
-  const match = value
-    .replace(/,/g, '')
-    .match(/(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB|PB)?/i)
-  if (!match) return null
-
-  const amount = Number(match[1])
-  if (!Number.isFinite(amount)) return null
-
-  const unit = (match[2] || 'GB').toUpperCase()
-  const unitToGb: Record<string, number> = {
-    B: 1 / 1024 / 1024 / 1024,
-    KB: 1 / 1024 / 1024,
-    MB: 1 / 1024,
-    GB: 1,
-    TB: 1024,
-    PB: 1024 * 1024,
-  }
-
-  return amount * (unitToGb[unit] ?? 1)
-}
-
-const getTrafficAlert = (value: string) => {
-  const gb = parseTrafficToGb(value)
-  if (gb === null) return null
-
-  if (gb <= 0) {
-    return {
-      severity: 'error' as const,
-      key: 'home.pewpew.account.dataExhausted',
-    }
-  }
-
-  if (gb < 2) {
-    return {
-      severity: 'warning' as const,
-      key: 'home.pewpew.account.lowData',
-    }
-  }
-
-  return null
-}
-
 const SubscriptionStatusCard = ({
+  accountEvaluation,
   status,
 }: {
+  accountEvaluation: PewPewAccountEvaluation
   status: PewPewSubscriptionStatus
 }) => {
   const { i18n, t } = useTranslation()
-  const expireAlert = getExpireAlert(status.expire)
-  const trafficAlert = getTrafficAlert(status.remainingTraffic)
-  const alerts = [expireAlert, trafficAlert].filter(Boolean) as Array<{
-    severity: 'error' | 'warning'
-    key: string
-  }>
+  const alert =
+    accountEvaluation.state === 'expired'
+      ? {
+          severity: 'error' as const,
+          key: 'home.pewpew.account.planExpiredContinue',
+        }
+      : accountEvaluation.state === 'dataExhausted'
+        ? {
+            severity: 'error' as const,
+            key: 'home.pewpew.account.dataExhaustedContinue',
+          }
+        : accountEvaluation.state === 'expiringSoon'
+          ? {
+              severity: 'warning' as const,
+              key: 'home.pewpew.account.expiringSoon',
+            }
+          : accountEvaluation.state === 'dataLow'
+            ? {
+                severity: 'warning' as const,
+                key: 'home.pewpew.account.lowData',
+              }
+            : null
   const formatStatusValue = (value: string) => {
     if (value === PEWPEW_UNKNOWN_STATUS) {
       return t('home.pewpew.account.unavailable')
+    }
+    if (/(?:长期有效|lifetime|unlimited)/i.test(value)) {
+      return t('home.pewpew.account.lifetime')
     }
     if (i18n.language === 'en') {
       return value.replace(/^(\d+)\s*天$/, (_, days) => `${days} days`)
@@ -848,7 +912,7 @@ const SubscriptionStatusCard = ({
         ))}
       </Box>
 
-      {alerts.map((alert) => (
+      {alert && (
         <Alert
           key={alert.key}
           severity={alert.severity}
@@ -857,7 +921,7 @@ const SubscriptionStatusCard = ({
         >
           {t(alert.key)}
         </Alert>
-      ))}
+      )}
     </Stack>
   )
 }
@@ -931,8 +995,12 @@ const GettingStartedCard = ({
 }
 
 const ConnectionSettingsCard = ({
+  accountBlockedText,
+  accountEvaluation,
   onDelayUpdated,
 }: {
+  accountBlockedText: string
+  accountEvaluation: PewPewAccountEvaluation
   onDelayUpdated: () => void
 }) => {
   const { t } = useTranslation()
@@ -972,7 +1040,12 @@ const ConnectionSettingsCard = ({
           }}
         >
           <Box sx={{ minWidth: 0 }}>
-            <CurrentProxyCard embedded onDelayUpdated={onDelayUpdated} />
+            <CurrentProxyCard
+              embedded
+              routeBlocked={accountEvaluation.blocked}
+              routeBlockedText={accountBlockedText}
+              onDelayUpdated={onDelayUpdated}
+            />
           </Box>
           <Box sx={{ minWidth: 0 }}>
             <Stack spacing={1} sx={{ height: '100%' }}>

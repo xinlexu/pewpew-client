@@ -4,9 +4,17 @@ node_modules
 dist
 dist-ssr
 build
+*.app
+*.dmg
 *.local
 .env
 .env.*
+*.yaml
+*.yml
+!pnpm-lock.yaml
+!crates/clash-verge-i18n/locales/*.yml
+!.github/**/*.yml
+!.github/**/*.yaml
 update.json
 scripts/_env.sh
 .vscode

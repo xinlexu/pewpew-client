@@ -22,6 +22,8 @@ import { showNotice } from '@/services/notice-service'
 interface ProxyTunCardProps {
   disabled?: boolean
   hasRoute?: boolean
+  connectionBlocked?: boolean
+  connectionBlockedText?: string
   repairing?: boolean
   onRepairNetwork?: () => Promise<void>
   onCopyDiagnostics?: () => Promise<void>
@@ -39,6 +41,8 @@ const getErrorMessage = (error: unknown) => {
 export const ProxyTunCard: FC<ProxyTunCardProps> = ({
   disabled = false,
   hasRoute = true,
+  connectionBlocked = false,
+  connectionBlockedText,
   repairing = false,
   onRepairNetwork,
   onCopyDiagnostics,
@@ -63,6 +67,7 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
   const enabled = confirmedState ?? systemProxyEnabled
   const busy = phase === 'connecting' || phase === 'disconnecting' || repairing
   const failed = phase === 'failed'
+  const connectBlocked = connectionBlocked && !enabled && !failed
   const statusKey =
     phase === 'connecting'
       ? 'home.pewpew.connectionStatus.connecting'
@@ -86,6 +91,12 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
 
   const handleConnectionAction = useLockFn(async () => {
     const next = failed ? true : !enabled
+    if (next && connectionBlocked) {
+      showNotice.error(
+        connectionBlockedText || t('home.pewpew.connection.importFirst'),
+      )
+      return
+    }
     if (next && !hasRoute) {
       showNotice.error(t('home.pewpew.connection.importFirst'))
       return
@@ -153,7 +164,7 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
         variant="contained"
         color={enabled && !failed ? 'success' : 'primary'}
         onClick={handleConnectionAction}
-        disabled={disabled || busy}
+        disabled={disabled || busy || connectBlocked}
         sx={{
           minHeight: { xs: 112, sm: 126 },
           borderRadius: 999,

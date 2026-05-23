@@ -36,6 +36,8 @@ import {
 
 interface CurrentProxyCardProps {
   embedded?: boolean
+  routeBlocked?: boolean
+  routeBlockedText?: string
   onDelayUpdated?: () => void
 }
 
@@ -76,6 +78,8 @@ const formatLineDelay = (
 
 export const CurrentProxyCard = ({
   embedded = false,
+  routeBlocked = false,
+  routeBlockedText,
   onDelayUpdated,
 }: CurrentProxyCardProps) => {
   const theme = useTheme()
@@ -120,7 +124,7 @@ export const CurrentProxyCard = ({
 
   const checkVisibleLineDelay = useCallback(
     async (force = false) => {
-      if (!groupName || options.length === 0) return
+      if (routeBlocked || !groupName || options.length === 0) return
 
       const now = Date.now()
       const lastCheckAt = lastDelayCheckAtRef.current[groupName] || 0
@@ -151,7 +155,7 @@ export const CurrentProxyCard = ({
         console.error('[PewPew] 线路延迟测试失败:', error)
       }
     },
-    [groupName, options],
+    [groupName, options, routeBlocked],
   )
 
   useEffect(() => {
@@ -183,10 +187,32 @@ export const CurrentProxyCard = ({
         </Box>
       ) : isCoreDataPending ? (
         <Box sx={{ py: 2.25 }} />
+      ) : routeBlocked ? (
+        <Stack direction="row" spacing={0.85} sx={{ alignItems: 'center' }}>
+          <FormControl fullWidth size="small">
+            <Select
+              value=""
+              disabled
+              displayEmpty
+              renderValue={() => (
+                <Typography component="span" color="error.main">
+                  {routeBlockedText || t('home.pewpew.connection.selectRoute')}
+                </Typography>
+              )}
+              sx={{
+                height: 42,
+                borderRadius: 2.5,
+                bgcolor: alpha(theme.palette.background.paper, 0.72),
+              }}
+            />
+          </FormControl>
+        </Stack>
       ) : !group || options.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 2.25 }}>
           <Typography variant="body1" color="text.secondary">
-            {t('home.pewpew.connection.importFirst')}
+            {currentProfile
+              ? t('home.pewpew.connection.noAvailableRoutes')
+              : t('home.pewpew.connection.importFirst')}
           </Typography>
         </Box>
       ) : (

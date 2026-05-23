@@ -184,11 +184,16 @@ export interface TranslationResources {
         }
         account: {
           dataExhausted: string
+          dataExhaustedContinue: string
+          dataExhaustedShort: string
           expire: string
           expired: string
           expiringSoon: string
+          lifetime: string
           lowData: string
           nextReset: string
+          planExpiredContinue: string
+          planExpiredShort: string
           remainingTraffic: string
           title: string
           unavailable: string
@@ -198,6 +203,7 @@ export interface TranslationResources {
           globalModeDescription: string
           importFirst: string
           mode: string
+          noAvailableRoutes: string
           recommended: string
           recommendedShort: string
           route: string
@@ -269,22 +275,35 @@ export interface TranslationResources {
         subscription: {
           autoUpdateFailed: string
           description: string
+          dropYaml: string
           import: string
           imported: string
           importFailed: string
           importing: string
           importSuccess: string
+          importYaml: string
           invalidUrl: string
           lastUpdated: string
+          localFile: string
           notImported: string
+          orImportYaml: string
           pasteFirst: string
           placeholder: string
+          subscriptionLink: string
           temporarilyStopped: string
           title: string
           update: string
           updateFailed: string
           updateSuccess: string
           updating: string
+          yamlFailed: string
+          yamlImporting: string
+          yamlNoRoutes: string
+          yamlOnly: string
+          yamlSuccess: string
+          yamlSupport: string
+          yamlSwitched: string
+          yamlTemporarilyStopped: string
         }
         switch: {
           currentRoute: string

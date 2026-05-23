@@ -5235,7 +5235,7 @@ dependencies = [
 
 [[package]]
 name = "pewpew-client"
-version = "2.5.2"
+version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "anyhow",

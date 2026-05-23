@@ -1,10 +1,10 @@
 [package]
 name = "pewpew-client"
-version = "2.5.2"
+version = "0.1.0"
 description = "PewPew云"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
-repository = "https://github.com/clash-verge-rev/clash-verge-rev.git"
+repository = "https://github.com/xinlexu/pewpew-client.git"
 default-run = "pewpew-client"
 build = "build.rs"
 edition = "2024"
@@ -24,7 +24,7 @@ clippy = ["tauri/test"]
 tracing = []
 
 [package.metadata.bundle]
-identifier = "io.github.clash-verge-rev.clash-verge-rev"
+identifier = "com.pewpewcloud.client"
 
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }
