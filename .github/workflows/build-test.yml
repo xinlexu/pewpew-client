@@ -23,10 +23,16 @@ jobs:
   mac-x64:
     name: macOS x64 test package
     if: inputs.platform == 'mac-x64'
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -34,7 +40,7 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Enable pnpm
+      - name: Enable Corepack
         run: corepack enable
 
       - name: Install dependencies
@@ -51,26 +57,37 @@ jobs:
       - name: Web build
         run: pnpm web:build
 
+      - name: Cargo check
+        run: cargo check --target x86_64-apple-darwin
+
       - name: Tauri build
         run: pnpm exec tauri build --target x86_64-apple-darwin
 
       - name: Check package architecture
         run: node scripts/check-macos-arch.mjs x64
 
-      - name: Upload DMG
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: pewpew-mac-x64-dmg
-          path: target/**/release/bundle/dmg/*.dmg
+          name: PewPewCloud-mac-x64
+          path: |
+            target/**/release/bundle/dmg/*.dmg
+            target/**/release/bundle/macos/*.app/**
           if-no-files-found: error
 
   mac-arm64:
     name: macOS arm64 test package
     if: inputs.platform == 'mac-arm64'
-    runs-on: macos-13
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -78,7 +95,7 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Enable pnpm
+      - name: Enable Corepack
         run: corepack enable
 
       - name: Install dependencies
@@ -95,26 +112,37 @@ jobs:
       - name: Web build
         run: pnpm web:build
 
+      - name: Cargo check
+        run: cargo check --target aarch64-apple-darwin
+
       - name: Tauri build
         run: pnpm exec tauri build --target aarch64-apple-darwin
 
       - name: Check package architecture
         run: node scripts/check-macos-arch.mjs arm64
 
-      - name: Upload DMG
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: pewpew-mac-arm64-dmg
-          path: target/**/release/bundle/dmg/*.dmg
+          name: PewPewCloud-mac-arm64
+          path: |
+            target/**/release/bundle/dmg/*.dmg
+            target/**/release/bundle/macos/*.app/**
           if-no-files-found: error
 
   windows-x64:
     name: Windows x64 test package
     if: inputs.platform == 'windows-x64'
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -122,7 +150,7 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Enable pnpm
+      - name: Enable Corepack
         run: corepack enable
 
       - name: Install dependencies
@@ -139,14 +167,31 @@ jobs:
       - name: Web build
         run: pnpm web:build
 
+      - name: Cargo check
+        run: cargo check --target x86_64-pc-windows-msvc
+
       - name: Tauri build
         run: pnpm exec tauri build --target x86_64-pc-windows-msvc
+
+      - name: Check Windows installers
+        shell: pwsh
+        run: |
+          $installers = @()
+          $installers += Get-ChildItem -Path "target" -Recurse -File -Include "*.exe","*.msi" | Where-Object {
+            $_.FullName -match "\\bundle\\(nsis|msi)\\"
+          }
+          if ($installers.Count -eq 0) {
+            Write-Error "No Windows installer was generated."
+            exit 1
+          }
+          $installers | ForEach-Object { Write-Host "Found installer: $($_.FullName)" }
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: pewpew-windows-x64-installer
+          name: PewPewCloud-windows-x64
           path: |
             target/**/release/bundle/nsis/*.exe
             target/**/release/bundle/nsis/*.msi
+            target/**/release/bundle/msi/*.msi
           if-no-files-found: error
