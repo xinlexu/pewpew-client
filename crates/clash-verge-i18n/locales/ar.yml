@@ -22,18 +22,18 @@ notifications:
     body: تمت إعادة تفعيل الملف التعريفي.
   appQuit:
     title: على وشك الخروج
-    body: Clash Verge على وشك الخروج.
+    body: PewPew Cloud is about to exit.
   appHidden:
     title: تم إخفاء التطبيق
-    body: Clash Verge يعمل في الخلفية.
+    body: PewPew Cloud is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: PewPew Cloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: يتطلب تثبيت خدمة Clash Verge صلاحيات المسؤول.
-  adminUninstallPrompt: يتطلب إلغاء تثبيت خدمة Clash Verge صلاحيات المسؤول.
+  adminInstallPrompt: Installing the PewPew Background Service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the PewPew Background Service requires administrator privileges.
 tray:
   dashboard: لوحة التحكم
   ruleMode: وضع القواعد
@@ -62,9 +62,9 @@ tray:
   openDir: فتح الدليل
   appLog: سجل التطبيق
   coreLog: سجل النواة
-  restartClash: إعادة تشغيل نواة Clash
+  restartClash: Restart Connection Core
   restartApp: إعادة تشغيل التطبيق
-  vergeVersion: إصدار Verge
+  vergeVersion: PewPew Cloud Version
   more: المزيد
   exit: خروج
   tooltip:

@@ -90,7 +90,7 @@
       "system": "System"
     },
     "clash": {
-      "title": "تنظیمات Clash",
+      "title": "تنظیمات Connection Core",
       "form": {
         "fields": {
           "allowLan": "اجازه LAN",
@@ -101,7 +101,7 @@
           "portConfig": "پیکربندی پورت",
           "external": "خارجی",
           "webUI": "رابط وب",
-          "clashCore": "هسته Clash",
+          "clashCore": "هسته Connection Core",
           "openUwpTool": "باز کردن ابزار UWP",
           "updateGeoData": "به‌روزرسانی GeoData",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "تنظیمات پایه Verge",
+        "title": "تنظیمات پایه PewPew Cloud",
         "actions": {
           "browse": "مرور کردن"
         },
@@ -173,7 +173,7 @@
         }
       },
       "advanced": {
-        "title": "تنظیمات پیشرفته Verge",
+        "title": "تنظیمات پیشرفته PewPew Cloud",
         "tooltips": {
           "backupInfo": "از فایل های پیکربندی پشتیبان WebDAV پشتیبانی می کند",
           "openConfDir": "اگر نرم‌افزار به‌طور غیرعادی اجرا می‌شود، از تمام فایل‌های موجود در این پوشه نسخه پشتیبان تهیه و پاک کنید تا نرم‌افزار را مجدداً راه‌اندازی کنید",
@@ -197,7 +197,7 @@
           "liteModeSettings": "LightWeight Mode Settings",
           "exit": "خروج",
           "exportDiagnostics": "Export Diagnostic Info",
-          "vergeVersion": "نسخه Verge"
+          "vergeVersion": "نسخه PewPew Cloud"
         }
       },
       "theme": {
@@ -624,7 +624,7 @@
   "feedback": {
     "notifications": {
       "clash": {
-        "restartSuccess": "هسته Clash مجدداً راه‌اندازی شد",
+        "restartSuccess": "هسته Connection Core مجدداً راه‌اندازی شد",
         "versionUpdated": "نسخه هسته به‌روزرسانی شد",
         "alreadyLatestVersion": "در حال حاضر از آخرین نسخه هسته استفاده می‌کنید",
         "changeSuccess": "هسته با موفقیت تغییر کرد",

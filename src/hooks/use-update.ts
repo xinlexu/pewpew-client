@@ -34,7 +34,7 @@ export const updateLastCheckTime = (timestamp?: number): number => {
 export const useUpdate = (enabled: boolean = true) => {
   useVerge()
 
-  // PewPew 客户版不检查 Clash Verge Rev 上游更新源。
+  // PewPew 客户版不检查上游更新源。
   const shouldCheck = enabled && false
 
   const {

@@ -90,7 +90,7 @@
       "system": "System"
     },
     "clash": {
-      "title": "Clash Ayarı",
+      "title": "Connection Core Ayarı",
       "form": {
         "fields": {
           "allowLan": "LAN'a İzin Ver",
@@ -101,7 +101,7 @@
           "portConfig": "Port Yapılandırması",
           "external": "Harici",
           "webUI": "Web Arayüzü",
-          "clashCore": "Clash Çekirdeği",
+          "clashCore": "Connection Core Çekirdeği",
           "openUwpTool": "UWP Aracını Aç",
           "updateGeoData": "GeoData'yı Güncelle",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Verge Temel Ayarı",
+        "title": "PewPew Cloud Temel Ayarı",
         "actions": {
           "browse": "Gözat"
         },
@@ -173,7 +173,7 @@
         }
       },
       "advanced": {
-        "title": "Verge Gelişmiş Ayarı",
+        "title": "PewPew Cloud Gelişmiş Ayarı",
         "tooltips": {
           "backupInfo": "WebDAV yedekleme yapılandırma dosyalarını destekler",
           "openConfDir": "Yazılım anormal çalışıyorsa, bu klasördeki tüm dosyaları YEDEKLEYİN ve silin, ardından yazılımı yeniden başlatın",
@@ -197,7 +197,7 @@
           "liteModeSettings": "Hafif Mod Ayarları",
           "exit": "Çıkış",
           "exportDiagnostics": "Tanılama Bilgilerini Dışa Aktar",
-          "vergeVersion": "Verge Sürümü"
+          "vergeVersion": "PewPew Cloud Sürümü"
         }
       },
       "theme": {
@@ -624,7 +624,7 @@
   "feedback": {
     "notifications": {
       "clash": {
-        "restartSuccess": "Clash Çekirdeği Yeniden Başlatıldı",
+        "restartSuccess": "Connection Core Çekirdeği Yeniden Başlatıldı",
         "versionUpdated": "Çekirdek Sürümü Güncellendi",
         "alreadyLatestVersion": "Zaten en yeni çekirdek sürümünü kullanıyorsunuz",
         "changeSuccess": "Çekirdek başarıyla değiştirildi",
@@ -636,8 +636,8 @@
         "uninstallSuccess": "Hizmet Başarıyla Kaldırıldı"
       },
       "updater": {
-        "withClashProxySuccess": "Clash vekil ile güncelleme başarılı",
-        "withClashProxyFailed": "Clash vekil ile bile güncelleme başarısız oldu"
+        "withClashProxySuccess": "Connection Core vekil ile güncelleme başarılı",
+        "withClashProxyFailed": "Connection Core vekil ile bile güncelleme başarısız oldu"
       }
     }
   },

@@ -84,7 +84,7 @@
     "notifications": {
       "importSuccess": "Abonnement erfolgreich importiert",
       "importSubscriptionSuccess": "Abonnement erfolgreich importiert",
-      "importWithClashProxy": "Abonnement mit Clash-Proxy importiert",
+      "importWithClashProxy": "Abonnement mit core proxy importiert",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {

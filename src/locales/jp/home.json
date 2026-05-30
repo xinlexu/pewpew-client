@@ -19,7 +19,7 @@
         "traffic": "トラフィック統計カード",
         "tests": "ウェブサイトテストカード",
         "ip": "IP情報カード",
-        "clashInfo": "Clash情報カード",
+        "clashInfo": "Connection Core情報カード",
         "systemInfo": "システム情報カード"
       },
       "title": "ホーム設定"
@@ -41,7 +41,7 @@
       }
     },
     "clashInfo": {
-      "title": "Clash情報",
+      "title": "Connection Core情報",
       "fields": {
         "coreVersion": "コアバージョン",
         "systemProxyAddress": "システムプロキシアドレス",
@@ -57,7 +57,7 @@
         "autoLaunch": "起動時に自動起動",
         "runningMode": "実行モード",
         "lastCheckUpdate": "最後の更新チェック",
-        "vergeVersion": "Vergeバージョン"
+        "vergeVersion": "PewPew Cloudバージョン"
       },
       "actions": {
         "settings": "設定"

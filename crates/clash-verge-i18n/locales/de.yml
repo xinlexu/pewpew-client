@@ -22,18 +22,18 @@ notifications:
     body: Profil reaktiviert.
   appQuit:
     title: Beenden steht bevor
-    body: Clash Verge wird gleich beendet.
+    body: PewPew Cloud is about to exit.
   appHidden:
     title: Anwendung ausgeblendet
-    body: Clash Verge läuft im Hintergrund.
+    body: PewPew Cloud is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: PewPew Cloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Für die Installation des Clash-Verge-Dienstes sind Administratorrechte erforderlich.
-  adminUninstallPrompt: Für die Deinstallation des Clash-Verge-Dienstes sind Administratorrechte erforderlich.
+  adminInstallPrompt: Installing the PewPew Background Service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the PewPew Background Service requires administrator privileges.
 tray:
   dashboard: Übersicht
   ruleMode: Regelmodus
@@ -62,9 +62,9 @@ tray:
   openDir: Verzeichnis öffnen
   appLog: Anwendungslog
   coreLog: Core-Log
-  restartClash: Clash-Core neu starten
+  restartClash: Restart Connection Core
   restartApp: Anwendung neu starten
-  vergeVersion: Verge-Version
+  vergeVersion: PewPew Cloud Version
   more: Mehr
   exit: Beenden
   tooltip:

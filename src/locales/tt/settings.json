@@ -90,7 +90,7 @@
       "system": "System"
     },
     "clash": {
-      "title": "Clash көйләүләре",
+      "title": "Connection Core көйләүләре",
       "form": {
         "fields": {
           "allowLan": "Локаль челтәргә рөхсәт",
@@ -101,7 +101,7 @@
           "portConfig": "Порт көйләүләре",
           "external": "Тышкы",
           "webUI": "Веб-интерфейс",
-          "clashCore": "Clash ядросы",
+          "clashCore": "Connection Core ядросы",
           "openUwpTool": "UWP инструментын ачу",
           "updateGeoData": "GeoData яңарту",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Verge Төп көйләүләр",
+        "title": "PewPew Cloud Төп көйләүләр",
         "actions": {
           "browse": "Карау"
         },
@@ -173,7 +173,7 @@
         }
       },
       "advanced": {
-        "title": "Verge Киңәйтелгән көйләүләр",
+        "title": "PewPew Cloud Киңәйтелгән көйләүләр",
         "tooltips": {
           "backupInfo": "WebDAV аша конфигурация файлын саклауны хуплый",
           "openConfDir": "Әгәр программада хаталар чыкса, бу папкадагы файлларны саклап калыгыз да, аннары барысын да бетереп, программаны яңадан башлагыз",
@@ -197,7 +197,7 @@
           "liteModeSettings": "LightWeight Mode Settings",
           "exit": "Чыгу",
           "exportDiagnostics": "Export Diagnostic Info",
-          "vergeVersion": "Verge версиясе"
+          "vergeVersion": "PewPew Cloud версиясе"
         }
       },
       "theme": {
@@ -624,7 +624,7 @@
   "feedback": {
     "notifications": {
       "clash": {
-        "restartSuccess": "Clash ядросы яңадан башланды",
+        "restartSuccess": "Connection Core ядросы яңадан башланды",
         "versionUpdated": "Ядро версиясе яңартылды",
         "alreadyLatestVersion": "Сез инде ядроның соңгы версиясен кулланасыз",
         "changeSuccess": "Ядро уңышлы алыштырылды",
@@ -636,8 +636,8 @@
         "uninstallSuccess": "Сервис уңышлы салдырылды"
       },
       "updater": {
-        "withClashProxySuccess": "Update with Clash proxy successfully",
-        "withClashProxyFailed": "Update failed even with Clash proxy"
+        "withClashProxySuccess": "Update with core proxy successfully",
+        "withClashProxyFailed": "Update failed even with core proxy"
       }
     }
   },

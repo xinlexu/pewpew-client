@@ -129,7 +129,7 @@ async fn perform_profile_update(
             logging!(
                 warn,
                 Type::Config,
-                "Warning: [订阅更新] 正常更新失败: {}，尝试使用Clash代理更新",
+                "Warning: [订阅更新] 正常更新失败: {}，尝试使用核心代理更新",
                 mask_err(&err.to_string())
             );
             last_err = err;
@@ -141,7 +141,7 @@ async fn perform_profile_update(
 
     match PrfItem::from_url(url, None, None, merged_opt.as_ref()).await {
         Ok(mut item) => {
-            logging!(info, Type::Config, "[订阅更新] 使用 Clash代理 更新订阅配置成功");
+            logging!(info, Type::Config, "[订阅更新] 使用核心代理更新订阅配置成功");
             profiles_draft_update_item_safe(uid, &mut item).await?;
             handle::Handle::notice_message("update_with_clash_proxy", profile_name);
             drop(last_err);
@@ -151,7 +151,7 @@ async fn perform_profile_update(
             logging!(
                 warn,
                 Type::Config,
-                "Warning: [订阅更新] Clash代理更新失败: {}，尝试使用系统代理更新",
+                "Warning: [订阅更新] 核心代理更新失败: {}，尝试使用系统代理更新",
                 mask_err(&err.to_string())
             );
             last_err = err;

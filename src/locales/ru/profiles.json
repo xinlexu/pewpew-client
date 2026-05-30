@@ -31,8 +31,8 @@
         "onlyYaml": "Поддерживаются только файлы YAML"
       },
       "notifications": {
-        "importRetry": "Не удалось импортировать, повторная попытка через Clash proxy...",
-        "importFail": "Не удалось импортировать даже через Clash proxy",
+        "importRetry": "Не удалось импортировать, повторная попытка через core proxy...",
+        "importFail": "Не удалось импортировать даже через core proxy",
         "importNeedsRefresh": "Профиль импортирован, но может потребоваться обновление вручную",
         "importSuccess": "Профиль успешно импортирован. Перезапустите приложение, если он не появился",
         "profileSwitched": "Профиль переключён",
@@ -108,14 +108,14 @@
         "httpTimeout": "Тайм-аут HTTP-запроса",
         "updateInterval": "Интервал обновления",
         "useSystemProxy": "Использовать системный прокси для обновления",
-        "useClashProxy": "Использовать Clash proxy для обновления",
+        "useClashProxy": "Использовать core proxy для обновления",
         "acceptInvalidCerts": "Принимать недействительные сертификаты (ОПАСНО)",
         "allowAutoUpdate": "Разрешить автообновление"
       },
       "feedback": {
         "notifications": {
-          "creationRetry": "Не удалось создать профиль, повторная попытка через Clash proxy...",
-          "creationSuccess": "Профиль успешно создан через Clash proxy"
+          "creationRetry": "Не удалось создать профиль, повторная попытка через core proxy...",
+          "creationSuccess": "Профиль успешно создан через core proxy"
         }
       }
     },

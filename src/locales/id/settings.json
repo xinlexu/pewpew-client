@@ -90,7 +90,7 @@
       "system": "System"
     },
     "clash": {
-      "title": "Pengaturan Clash",
+      "title": "Pengaturan Connection Core",
       "form": {
         "fields": {
           "allowLan": "Izinkan LAN",
@@ -101,7 +101,7 @@
           "portConfig": "Konfigurasi Port",
           "external": "Eksternal",
           "webUI": "Antarmuka Web",
-          "clashCore": "Inti Clash",
+          "clashCore": "Inti Connection Core",
           "openUwpTool": "Buka alat UWP",
           "updateGeoData": "Perbarui GeoData",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Pengaturan Dasar Verge",
+        "title": "Pengaturan Dasar PewPew Cloud",
         "actions": {
           "browse": "Jelajahi"
         },
@@ -173,7 +173,7 @@
         }
       },
       "advanced": {
-        "title": "Pengaturan Lanjutan Verge",
+        "title": "Pengaturan Lanjutan PewPew Cloud",
         "tooltips": {
           "backupInfo": "Mendukung file konfigurasi cadangan WebDAV",
           "openConfDir": "Jika perangkat lunak berjalan tidak normal, CADANGKAN dan hapus semua file di folder ini lalu mulai ulang perangkat lunak",
@@ -197,7 +197,7 @@
           "liteModeSettings": "LightWeight Mode Settings",
           "exit": "Keluar",
           "exportDiagnostics": "Export Diagnostic Info",
-          "vergeVersion": "Versi Verge"
+          "vergeVersion": "Versi PewPew Cloud"
         }
       },
       "theme": {
@@ -624,7 +624,7 @@
   "feedback": {
     "notifications": {
       "clash": {
-        "restartSuccess": "Core Clash Dimulai Ulang",
+        "restartSuccess": "Core Connection Core Dimulai Ulang",
         "versionUpdated": "Versi Core Diperbarui",
         "alreadyLatestVersion": "Sudah menggunakan versi inti terbaru",
         "changeSuccess": "Inti berhasil diubah",
@@ -636,8 +636,8 @@
         "uninstallSuccess": "Layanan Berhasil Dicopot"
       },
       "updater": {
-        "withClashProxySuccess": "Update with Clash proxy successfully",
-        "withClashProxyFailed": "Update failed even with Clash proxy"
+        "withClashProxySuccess": "Update with core proxy successfully",
+        "withClashProxyFailed": "Update failed even with core proxy"
       }
     }
   },

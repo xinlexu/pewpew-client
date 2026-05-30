@@ -31,8 +31,8 @@
         "onlyYaml": "YAML 파일만 지원됩니다"
       },
       "notifications": {
-        "importRetry": "가져오기에 실패했습니다. Clash 프록시로 다시 시도 중...",
-        "importFail": "Clash 프록시로도 가져오기에 실패했습니다",
+        "importRetry": "가져오기에 실패했습니다. Connection Core 프록시로 다시 시도 중...",
+        "importFail": "Connection Core 프록시로도 가져오기에 실패했습니다",
         "importNeedsRefresh": "프로필을 가져왔지만 수동 새로고침이 필요할 수 있습니다",
         "importSuccess": "프로필을 성공적으로 가져왔습니다. 보이지 않으면 재시작하세요",
         "profileSwitched": "프로필 전환됨",
@@ -108,14 +108,14 @@
         "httpTimeout": "HTTP 요청 시간 초과",
         "updateInterval": "업데이트 간격",
         "useSystemProxy": "시스템 프록시 사용",
-        "useClashProxy": "Clash 프록시 사용",
+        "useClashProxy": "Connection Core 프록시 사용",
         "acceptInvalidCerts": "잘못된 인증서 허용(위험)",
         "allowAutoUpdate": "자동 업데이트 허용"
       },
       "feedback": {
         "notifications": {
-          "creationRetry": "프로필 생성 실패, Clash 프록시로 다시 시도 중...",
-          "creationSuccess": "Clash 프록시로 프로필 생성 성공"
+          "creationRetry": "프로필 생성 실패, Connection Core 프록시로 다시 시도 중...",
+          "creationSuccess": "Connection Core 프록시로 프로필 생성 성공"
         }
       }
     },

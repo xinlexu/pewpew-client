@@ -22,18 +22,18 @@ notifications:
     body: Профиль повторно активирован.
   appQuit:
     title: Скорый выход
-    body: Clash Verge скоро завершит работу.
+    body: PewPew Cloud is about to exit.
   appHidden:
     title: Приложение скрыто
-    body: Clash Verge работает в фоновом режиме.
+    body: PewPew Cloud is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: PewPew Cloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Для установки службы Clash Verge требуются права администратора.
-  adminUninstallPrompt: Для удаления службы Clash Verge требуются права администратора.
+  adminInstallPrompt: Installing the PewPew Background Service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the PewPew Background Service requires administrator privileges.
 tray:
   dashboard: Панель
   ruleMode: Режим правил
@@ -62,9 +62,9 @@ tray:
   openDir: Открыть каталог
   appLog: Журнал приложения
   coreLog: Журнал ядра
-  restartClash: Перезапустить ядро Clash
+  restartClash: Restart Connection Core
   restartApp: Перезапустить приложение
-  vergeVersion: Версия Verge
+  vergeVersion: PewPew Cloud Version
   more: Еще
   exit: Выход
   tooltip:

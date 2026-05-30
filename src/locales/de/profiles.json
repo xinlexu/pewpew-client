@@ -31,8 +31,8 @@
         "onlyYaml": "Nur YAML-Dateien werden unterstützt"
       },
       "notifications": {
-        "importRetry": "Import des Abonnements fehlgeschlagen. Versuche es mit dem Clash-Proxy erneut...",
-        "importFail": "Import des Abonnements auch mit Clash-Proxy fehlgeschlagen",
+        "importRetry": "Import des Abonnements fehlgeschlagen. Versuche es mit dem core proxy erneut...",
+        "importFail": "Import des Abonnements auch mit core proxy fehlgeschlagen",
         "importNeedsRefresh": "Profile imported but may need manual refresh",
         "importSuccess": "Profile imported successfully, please restart if not visible",
         "profileSwitched": "Abonnement gewechselt",
@@ -114,8 +114,8 @@
       },
       "feedback": {
         "notifications": {
-          "creationRetry": "Erstellung des Abonnements fehlgeschlagen. Versuche es mit dem Clash-Proxy erneut...",
-          "creationSuccess": "Erstellung des Abonnements mit Clash-Proxy erfolgreich"
+          "creationRetry": "Erstellung des Abonnements fehlgeschlagen. Versuche es mit dem core proxy erneut...",
+          "creationSuccess": "Erstellung des Abonnements mit core proxy erfolgreich"
         }
       }
     },

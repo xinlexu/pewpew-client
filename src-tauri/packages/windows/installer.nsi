@@ -535,7 +535,7 @@ FunctionEnd
 
 
 !macro CheckAllVergeProcesses
-  ; Check if clash-verge-service.exe is running
+  ; Check if the background service is running
   !if "${INSTALLMODE}" == "currentUser"
     nsis_tauri_utils::FindProcessCurrentUser "clash-verge-service.exe"
   !else
@@ -543,7 +543,7 @@ FunctionEnd
   !endif
   Pop $R0
   ${If} $R0 = 0
-    DetailPrint "Kill clash-verge-service.exe..."
+    DetailPrint "Stopping PewPew Background Service..."
     !if "${INSTALLMODE}" == "currentUser"
       nsis_tauri_utils::KillProcessCurrentUser "clash-verge-service.exe"
     !else
@@ -551,7 +551,7 @@ FunctionEnd
     !endif
   ${EndIf}
 
-  ; Check if verge-mihomo-alpha.exe is running
+  ; Check if the alpha connection core is running
   !if "${INSTALLMODE}" == "currentUser"
     nsis_tauri_utils::FindProcessCurrentUser "verge-mihomo-alpha.exe"
   !else
@@ -559,7 +559,7 @@ FunctionEnd
   !endif
   Pop $R0
   ${If} $R0 = 0
-    DetailPrint "Kill verge-mihomo-alpha.exe..."
+    DetailPrint "Stopping alpha connection core..."
     !if "${INSTALLMODE}" == "currentUser"
       nsis_tauri_utils::KillProcessCurrentUser "verge-mihomo-alpha.exe"
     !else
@@ -567,7 +567,7 @@ FunctionEnd
     !endif
   ${EndIf}
 
-  ; Check if verge-mihomo.exe is running
+  ; Check if the connection core is running
   !if "${INSTALLMODE}" == "currentUser"
     nsis_tauri_utils::FindProcessCurrentUser "verge-mihomo.exe"
   !else
@@ -575,7 +575,7 @@ FunctionEnd
   !endif
   Pop $R0
   ${If} $R0 = 0
-    DetailPrint "Kill verge-mihomo.exe..."
+    DetailPrint "Stopping connection core..."
     !if "${INSTALLMODE}" == "currentUser"
       nsis_tauri_utils::KillProcessCurrentUser "verge-mihomo.exe"
     !else
@@ -591,7 +591,7 @@ FunctionEnd
   !endif
   Pop $R0
   ${If} $R0 = 0
-    DetailPrint "Kill clash-meta-alpha.exe..."
+    DetailPrint "Stopping legacy alpha connection core..."
     !if "${INSTALLMODE}" == "currentUser"
       nsis_tauri_utils::KillProcessCurrentUser "clash-meta-alpha.exe"
     !else
@@ -607,7 +607,7 @@ FunctionEnd
   !endif
   Pop $R0
   ${If} $R0 = 0
-    DetailPrint "Kill clash-meta.exe..."
+    DetailPrint "Stopping legacy connection core..."
     !if "${INSTALLMODE}" == "currentUser"
       nsis_tauri_utils::KillProcessCurrentUser "clash-meta.exe"
     !else
@@ -622,6 +622,9 @@ FunctionEnd
   Pop $0  ; 0: service exists; other: service not exists
   ; Service exists
   ${If} $0 == 0
+    SetRegView 64
+    WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "DisplayName" "PewPew Background Service"
+    WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "Description" "PewPew Background Service helps to launch the connection core"
     Push $0
     ; Check if the service is running
     SimpleSC::ServiceIsRunning "clash_verge_service"
@@ -630,14 +633,14 @@ FunctionEnd
     ${If} $0 == 0
       Push $0
       ${If} $1 == 0
-        DetailPrint "Restart ${PRODUCTNAME} Service..."
+        DetailPrint "Restart PewPew Background Service..."
         SimpleSC::StartService "clash_verge_service" "" 30
       ${EndIf}
     ${ElseIf} $0 != 0
       Push $0
       SimpleSC::GetErrorMessage
       Pop $0
-      MessageBox MB_OK|MB_ICONSTOP "Check Service Status Error ($0)"
+      MessageBox MB_OK|MB_ICONSTOP "Background service status check failed ($0)"
     ${EndIf}
   ${EndIf}
 !macroend
@@ -656,27 +659,27 @@ FunctionEnd
     ${If} $0 == 0
       Push $0
       ${If} $1 == 1
-        DetailPrint "Stop ${PRODUCTNAME} Service..."
+        DetailPrint "Stop PewPew Background Service..."
         SimpleSC::StopService "clash_verge_service" 1 30
         Pop $0 ; returns an errorcode (<>0) otherwise success (0)
         ${If} $0 == 0
-          DetailPrint "Removing ${PRODUCTNAME} Service..."
+          DetailPrint "Removing PewPew Background Service..."
           SimpleSC::RemoveService "clash_verge_service"
         ${ElseIf} $0 != 0
           Push $0
           SimpleSC::GetErrorMessage
           Pop $0
-          MessageBox MB_OK|MB_ICONSTOP "${PRODUCTNAME} Service Stop Error ($0)"
+          MessageBox MB_OK|MB_ICONSTOP "Background service failed to start. Restart the client or contact support. ($0)"
         ${EndIf}
       ${ElseIf} $1 == 0
-        DetailPrint "Removing ${PRODUCTNAME} Service..."
+        DetailPrint "Removing PewPew Background Service..."
         SimpleSC::RemoveService "clash_verge_service"
       ${EndIf}
     ${ElseIf} $0 != 0
       Push $0
       SimpleSC::GetErrorMessage
       Pop $0
-      MessageBox MB_OK|MB_ICONSTOP "Check Service Status Error ($0)"
+      MessageBox MB_OK|MB_ICONSTOP "Background service status check failed ($0)"
     ${EndIf}
   ${EndIf}
 !macroend

@@ -33,7 +33,7 @@ pub fn open_web_url(url: String) -> CmdResult<()> {
 }
 
 // TODO 后续可以为前端提供接口，当前作为托盘菜单使用
-/// 打开 Verge 最新日志
+/// 打开应用最新日志
 #[tauri::command]
 pub async fn open_app_log() -> CmdResult<()> {
     let log_path = dirs::app_latest_log().stringify_err()?;
@@ -43,7 +43,7 @@ pub async fn open_app_log() -> CmdResult<()> {
 }
 
 // TODO 后续可以为前端提供接口，当前作为托盘菜单使用
-/// 打开 Clash 最新日志
+/// 打开连接核心最新日志
 #[tauri::command]
 pub async fn open_core_log() -> CmdResult<()> {
     let log_path = dirs::clash_latest_log().stringify_err()?;

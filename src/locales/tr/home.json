@@ -19,7 +19,7 @@
         "traffic": "Trafik İstatistikleri Kartı",
         "tests": "Web Sitesi Testleri Kartı",
         "ip": "IP Bilgi Kartı",
-        "clashInfo": "Clash Bilgi Kartları",
+        "clashInfo": "Connection Core Bilgi Kartları",
         "systemInfo": "Sistem Bilgi Kartları"
       },
       "title": "Ana Sayfa Ayarları"
@@ -41,7 +41,7 @@
       }
     },
     "clashInfo": {
-      "title": "Clash Bilgisi",
+      "title": "Connection Core Bilgisi",
       "fields": {
         "coreVersion": "Çekirdek Sürümü",
         "systemProxyAddress": "Sistem Vekil Adresi",
@@ -57,7 +57,7 @@
         "autoLaunch": "Otomatik Başlatma",
         "runningMode": "Çalışma Modu",
         "lastCheckUpdate": "Son Güncelleme Kontrolü",
-        "vergeVersion": "Verge Sürümü"
+        "vergeVersion": "PewPew Cloud Sürümü"
       },
       "actions": {
         "settings": "Ayarlar"

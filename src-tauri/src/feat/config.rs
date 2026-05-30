@@ -287,7 +287,7 @@ pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
     if !not_save_file {
         // 分离数据获取和异步调用
         let verge_data = Config::verge().await.data_arc();
-        logging!(debug, Type::Setup, "Saving Verge configuration to file...");
+        logging!(debug, Type::Setup, "Saving PewPew Cloud configuration to file...");
         verge_data.save_file().await?;
     }
     Ok(())

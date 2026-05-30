@@ -90,7 +90,7 @@
       "system": "系统"
     },
     "clash": {
-      "title": "Clash 设置",
+      "title": "连接核心设置",
       "form": {
         "fields": {
           "allowLan": "局域网连接",
@@ -101,7 +101,7 @@
           "portConfig": "端口设置",
           "external": "外部控制",
           "webUI": "网页界面",
-          "clashCore": "Clash 内核",
+          "clashCore": "连接核心",
           "openUwpTool": "UWP 工具",
           "updateGeoData": "更新 GeoData",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Verge 基础设置",
+        "title": "PewPew 云基础设置",
         "actions": {
           "browse": "浏览"
         },
@@ -173,18 +173,18 @@
         }
       },
       "advanced": {
-        "title": "Verge 高级设置",
+        "title": "PewPew 云高级设置",
         "tooltips": {
           "backupInfo": "支持本地或 WebDAV 方式备份配置文件",
           "openConfDir": "如果软件运行异常，!备份!并删除此文件夹下的所有文件，重启软件",
           "liteMode": "关闭 GUI 界面，仅保留内核运行"
         },
         "actions": {
-          "copyVersion": "复制 Verge 版本号"
+          "copyVersion": "复制 PewPew 云版本号"
         },
         "notifications": {
           "latestVersion": "当前已是最新版本",
-          "versionCopied": "Verge 版本已复制到剪贴板"
+          "versionCopied": "PewPew 云版本已复制到剪贴板"
         },
         "fields": {
           "backupSetting": "备份设置",
@@ -197,7 +197,7 @@
           "liteModeSettings": "轻量模式设置",
           "exit": "退出",
           "exportDiagnostics": "导出诊断信息",
-          "vergeVersion": "Verge 版本"
+          "vergeVersion": "PewPew 云版本"
         }
       },
       "theme": {
@@ -624,7 +624,7 @@
   "feedback": {
     "notifications": {
       "clash": {
-        "restartSuccess": "已重启 Clash 内核",
+        "restartSuccess": "已重启连接核心",
         "versionUpdated": "内核版本已更新",
         "alreadyLatestVersion": "已经是最新内核版本",
         "changeSuccess": "内核切换成功",
@@ -636,8 +636,8 @@
         "uninstallSuccess": "已成功卸载服务"
       },
       "updater": {
-        "withClashProxySuccess": "使用 Clash 代理更新成功",
-        "withClashProxyFailed": "使用 Clash 代理更新失败"
+        "withClashProxySuccess": "使用核心代理更新成功",
+        "withClashProxyFailed": "使用核心代理更新失败"
       }
     }
   },

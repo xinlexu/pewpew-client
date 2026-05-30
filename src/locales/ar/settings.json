@@ -90,7 +90,7 @@
       "system": "System"
     },
     "clash": {
-      "title": "إعدادات Clash",
+      "title": "إعدادات Connection Core",
       "form": {
         "fields": {
           "allowLan": "السماح بالشبكة المحلية",
@@ -101,7 +101,7 @@
           "portConfig": "تكوين المنافذ",
           "external": "خارجي",
           "webUI": "واجهة الويب",
-          "clashCore": "نواة Clash",
+          "clashCore": "نواة Connection Core",
           "openUwpTool": "فتح أداة UWP",
           "updateGeoData": "تحديث البيانات الجغرافية",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "الإعدادات الأساسية  Verge",
+        "title": "الإعدادات الأساسية  PewPew Cloud",
         "actions": {
           "browse": "استعراض"
         },
@@ -173,7 +173,7 @@
         }
       },
       "advanced": {
-        "title": "الإعدادات الأساسية  Verge",
+        "title": "الإعدادات الأساسية  PewPew Cloud",
         "tooltips": {
           "backupInfo": "Support local or WebDAV backup of configuration files",
           "openConfDir": "إذا عمل البرنامج بشكل غير طبيعي، قم بالنسخ الاحتياطي ثم حذف جميع الملفات في هذا المجلد ثم أعد تشغيل البرنامج",
@@ -197,7 +197,7 @@
           "liteModeSettings": "LightWeight Mode Settings",
           "exit": "خروج",
           "exportDiagnostics": "Export Diagnostic Info",
-          "vergeVersion": "إصدار Verge"
+          "vergeVersion": "إصدار PewPew Cloud"
         }
       },
       "theme": {
@@ -624,7 +624,7 @@
   "feedback": {
     "notifications": {
       "clash": {
-        "restartSuccess": "تم إعادة تشغيل نواة Clash",
+        "restartSuccess": "تم إعادة تشغيل نواة Connection Core",
         "versionUpdated": "تم تحديث إصدار النواة",
         "alreadyLatestVersion": "أنت تستخدم بالفعل أحدث إصدار من النواة",
         "changeSuccess": "تم تغيير النواة بنجاح",
@@ -636,8 +636,8 @@
         "uninstallSuccess": "تم إلغاء تثبيت الخدمة بنجاح"
       },
       "updater": {
-        "withClashProxySuccess": "Update with Clash proxy successfully",
-        "withClashProxyFailed": "Update failed even with Clash proxy"
+        "withClashProxySuccess": "Update with core proxy successfully",
+        "withClashProxyFailed": "Update failed even with core proxy"
       }
     }
   },

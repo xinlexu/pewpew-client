@@ -19,7 +19,7 @@
         "traffic": "Карточка трафика",
         "tests": "Карточка проверки доступности сайтов",
         "ip": "Информация об IP",
-        "clashInfo": "Информация о Clash",
+        "clashInfo": "Информация о Connection Core",
         "systemInfo": "Информация о системе"
       },
       "title": "Настройки главной страницы"
@@ -31,7 +31,7 @@
       "status": {
         "systemProxyEnabled": "Системный прокси включён — приложения используют его для доступа в сеть",
         "systemProxyDisabled": "Системный прокси отключён — большинству пользователей рекомендуется его включить",
-        "tunModeServiceRequired": "Режим TUN требует установленной службы Clash Verge",
+        "tunModeServiceRequired": "Режим TUN требует установленной службы PewPew Cloud",
         "tunModeEnabled": "Режим TUN включён — приложения используют виртуальный сетевой интерфейс",
         "tunModeDisabled": "Режим TUN отключён"
       },
@@ -41,7 +41,7 @@
       }
     },
     "clashInfo": {
-      "title": "Информация о Clash",
+      "title": "Информация о Connection Core",
       "fields": {
         "coreVersion": "Версия ядра",
         "systemProxyAddress": "Адрес системного прокси",
@@ -57,7 +57,7 @@
         "autoLaunch": "Автозапуск",
         "runningMode": "Режим работы",
         "lastCheckUpdate": "Последняя проверка обновлений",
-        "vergeVersion": "Версия Clash Verge Rev"
+        "vergeVersion": "Версия PewPew Cloud Client"
       },
       "actions": {
         "settings": "Настройки"

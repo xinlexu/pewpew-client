@@ -33,6 +33,47 @@ pub enum ServiceStatus {
 pub struct ServiceManager(ServiceStatus);
 
 #[cfg(target_os = "windows")]
+const WINDOWS_SERVICE_NAME: &str = "clash_verge_service";
+#[cfg(target_os = "windows")]
+const WINDOWS_SERVICE_DISPLAY_NAME: &str = "PewPew Background Service";
+#[cfg(target_os = "windows")]
+const WINDOWS_SERVICE_DESCRIPTION: &str = "PewPew Background Service helps to launch the connection core";
+
+#[cfg(target_os = "windows")]
+fn apply_service_branding_privileged() -> Result<()> {
+    use std::os::windows::process::CommandExt as _;
+
+    let status = StdCommand::new("sc.exe")
+        .args([
+            "config",
+            WINDOWS_SERVICE_NAME,
+            "DisplayName=",
+            WINDOWS_SERVICE_DISPLAY_NAME,
+        ])
+        .creation_flags(0x08000000)
+        .status()?;
+    if !status.success() {
+        bail!(
+            "failed to update service display name with status {}",
+            status.code().unwrap_or(-1)
+        );
+    }
+
+    let status = StdCommand::new("sc.exe")
+        .args(["description", WINDOWS_SERVICE_NAME, WINDOWS_SERVICE_DESCRIPTION])
+        .creation_flags(0x08000000)
+        .status()?;
+    if !status.success() {
+        bail!(
+            "failed to update service description with status {}",
+            status.code().unwrap_or(-1)
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
 fn uninstall_service() -> Result<()> {
     logging!(info, Type::Service, "uninstall service");
 
@@ -84,7 +125,15 @@ fn install_service() -> Result<()> {
     let level = token.privilege_level()?;
     let output = match level {
         PrivilegeLevel::NotPrivileged => {
-            let status = RunasCommand::new(&install_path).show(false).status()?;
+            let command = format!(
+                r#""{}" && sc.exe config {} DisplayName= "{}" && sc.exe description {} "{}""#,
+                install_path.display(),
+                WINDOWS_SERVICE_NAME,
+                WINDOWS_SERVICE_DISPLAY_NAME,
+                WINDOWS_SERVICE_NAME,
+                WINDOWS_SERVICE_DESCRIPTION
+            );
+            let status = RunasCommand::new("cmd").arg("/C").arg(command).show(false).status()?;
             Output {
                 status,
                 stdout: Vec::new(),
@@ -92,8 +141,11 @@ fn install_service() -> Result<()> {
             }
         }
         _ => {
-            // StdCommand returns Output directly
-            StdCommand::new(&install_path).creation_flags(0x08000000).output()?
+            let output = StdCommand::new(&install_path).creation_flags(0x08000000).output()?;
+            if output.status.success() {
+                apply_service_branding_privileged()?;
+            }
+            output
         }
     };
 
@@ -363,7 +415,7 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
 
     let response = clash_verge_service_ipc::start_clash(&payload)
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("后台服务启动失败，请重启客户端或联系客服")?;
 
     if response.code > 0 {
         let err_msg = response.message;
@@ -386,19 +438,19 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
 }
 
 pub(super) async fn get_clash_logs_by_service() -> Result<Vec<CompactString>> {
-    logging!(info, Type::Service, "正在获取服务模式下的 Clash 日志");
+    logging!(info, Type::Service, "正在获取服务模式下的连接核心日志");
 
     let response = clash_verge_service_ipc::get_clash_logs()
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("无法连接到 PewPew 后台服务")?;
 
     if response.code > 0 {
         let err_msg = response.message;
-        logging!(error, Type::Service, "获取服务模式下的 Clash 日志失败: {}", err_msg);
+        logging!(error, Type::Service, "获取服务模式下的连接核心日志失败: {}", err_msg);
         bail!(err_msg);
     }
 
-    logging!(info, Type::Service, "成功获取服务模式下的 Clash 日志");
+    logging!(info, Type::Service, "成功获取服务模式下的连接核心日志");
     Ok(response.data.unwrap_or_default())
 }
 
@@ -408,7 +460,7 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
 
     let response = clash_verge_service_ipc::stop_clash()
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("无法连接到 PewPew 后台服务")?;
 
     if response.code > 0 {
         let err_msg = response.message;

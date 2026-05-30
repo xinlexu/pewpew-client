@@ -22,18 +22,18 @@ notifications:
     body: Profil diaktifkan kembali.
   appQuit:
     title: Akan Keluar
-    body: Clash Verge akan keluar.
+    body: PewPew Cloud is about to exit.
   appHidden:
     title: Aplikasi Disembunyikan
-    body: Clash Verge berjalan di latar belakang.
+    body: PewPew Cloud is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: PewPew Cloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Menginstal layanan Clash Verge memerlukan hak administrator.
-  adminUninstallPrompt: Menghapus instalasi layanan Clash Verge memerlukan hak administrator.
+  adminInstallPrompt: Installing the PewPew Background Service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the PewPew Background Service requires administrator privileges.
 tray:
   dashboard: Dasbor
   ruleMode: Mode Aturan
@@ -62,9 +62,9 @@ tray:
   openDir: Buka Direktori
   appLog: Log Aplikasi
   coreLog: Log Core
-  restartClash: Mulai Ulang Core Clash
+  restartClash: Restart Connection Core
   restartApp: Mulai Ulang Aplikasi
-  vergeVersion: Versi Verge
+  vergeVersion: PewPew Cloud Version
   more: Lainnya
   exit: Keluar
   tooltip:

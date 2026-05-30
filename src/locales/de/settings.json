@@ -90,7 +90,7 @@
       "system": "System"
     },
     "clash": {
-      "title": "Clash-Einstellungen",
+      "title": "Connection Core-Einstellungen",
       "form": {
         "fields": {
           "allowLan": "Netzwerkverbindung im lokalen Netzwerk zulassen",
@@ -101,7 +101,7 @@
           "portConfig": "Port-Konfiguration",
           "external": "Externe Steuerung",
           "webUI": "Web-Oberfläche",
-          "clashCore": "Clash-Kern",
+          "clashCore": "Connection Core-Kern",
           "openUwpTool": "UWP-Tool öffnen",
           "updateGeoData": "Geo-Daten aktualisieren",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Verge-Grundeinstellungen",
+        "title": "PewPew Cloud-Grundeinstellungen",
         "actions": {
           "browse": "Durchsuchen"
         },
@@ -173,7 +173,7 @@
         }
       },
       "advanced": {
-        "title": "Verge-Erweiterte Einstellungen",
+        "title": "PewPew Cloud-Erweiterte Einstellungen",
         "tooltips": {
           "backupInfo": "Unterstützt die Sicherung von Konfigurationsdateien über WebDAV",
           "openConfDir": "Wenn die Software fehlerhaft funktioniert, !sichern Sie! alle Dateien in diesem Verzeichnis, löschen Sie sie und starten Sie die Software neu.",
@@ -197,7 +197,7 @@
           "liteModeSettings": "Einstellungen für den Leichtgewichtigen Modus",
           "exit": "Beenden",
           "exportDiagnostics": "Diagnoseinformationen exportieren",
-          "vergeVersion": "Verge-Version"
+          "vergeVersion": "PewPew Cloud-Version"
         }
       },
       "theme": {
@@ -624,7 +624,7 @@
   "feedback": {
     "notifications": {
       "clash": {
-        "restartSuccess": "Clash-Kern wurde neu gestartet",
+        "restartSuccess": "Connection Core-Kern wurde neu gestartet",
         "versionUpdated": "Kernversion wurde aktualisiert",
         "alreadyLatestVersion": "Bereits die neueste Kernversion in Verwendung",
         "changeSuccess": "Kern erfolgreich gewechselt",
@@ -636,8 +636,8 @@
         "uninstallSuccess": "Service erfolgreich deinstalliert"
       },
       "updater": {
-        "withClashProxySuccess": "Aktualisierung mit Clash-Proxy erfolgreich",
-        "withClashProxyFailed": "Aktualisierung auch mit Clash-Proxy fehlgeschlagen"
+        "withClashProxySuccess": "Aktualisierung mit core proxy erfolgreich",
+        "withClashProxyFailed": "Aktualisierung auch mit core proxy fehlgeschlagen"
       }
     }
   },

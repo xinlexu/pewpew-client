@@ -22,18 +22,18 @@ notifications:
     body: 프로필이 다시 활성화되었습니다.
   appQuit:
     title: 곧 종료
-    body: Clash Verge가 곧 종료됩니다.
+    body: PewPew Cloud is about to exit.
   appHidden:
     title: 앱이 숨겨짐
-    body: Clash Verge가 백그라운드에서 실행 중입니다.
+    body: PewPew Cloud is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: PewPew Cloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash Verge 서비스 설치에는 관리자 권한이 필요합니다.
-  adminUninstallPrompt: Clash Verge 서비스 제거에는 관리자 권한이 필요합니다.
+  adminInstallPrompt: Installing the PewPew Background Service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the PewPew Background Service requires administrator privileges.
 tray:
   dashboard: 대시보드
   ruleMode: 규칙 모드
@@ -62,9 +62,9 @@ tray:
   openDir: 디렉터리 열기
   appLog: 애플리케이션 로그
   coreLog: 코어 로그
-  restartClash: Clash 코어 재시작
+  restartClash: Restart Connection Core
   restartApp: 애플리케이션 재시작
-  vergeVersion: Verge 버전
+  vergeVersion: PewPew Cloud Version
   more: 더 보기
   exit: 종료
   tooltip:

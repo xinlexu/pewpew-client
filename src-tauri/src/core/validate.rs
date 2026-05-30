@@ -298,7 +298,7 @@ impl CoreConfigValidator {
         let is_script = match Self::is_script_file(config_path).await {
             Ok(result) => result,
             Err(err) => {
-                // 如果无法确定文件类型，尝试使用Clash内核验证
+                // 如果无法确定文件类型，尝试使用连接核心验证
                 logging!(warn, Type::Validate, "无法确定文件类型: {}, 错误: {}", config_path, err);
                 return Self::validate_config_internal_outcome(config_path).await;
             }
@@ -314,8 +314,8 @@ impl CoreConfigValidator {
             return Self::validate_script_file_outcome(config_path).await;
         }
 
-        // 对YAML配置文件使用Clash内核验证
-        logging!(info, Type::Validate, "使用Clash内核验证配置文件: {}", config_path);
+        // 对YAML配置文件使用连接核心验证
+        logging!(info, Type::Validate, "使用连接核心验证配置文件: {}", config_path);
         Self::validate_config_internal_outcome(config_path).await
     }
 

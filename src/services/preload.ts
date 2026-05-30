@@ -54,7 +54,7 @@ export const preloadConfig = async () => {
     setPreloadConfig(config)
     return config
   } catch (error) {
-    console.warn('[preload.ts] Failed to read Verge config:', error)
+    console.warn('[preload.ts] Failed to read client config:', error)
     setPreloadConfig(null)
     return null
   }
@@ -81,7 +81,7 @@ export const preloadLanguage = async (
       resolvedConfig = await loadConfig()
     } catch (error) {
       console.warn(
-        '[preload.ts] Failed to read language from Verge config:',
+        '[preload.ts] Failed to read language from client config:',
         error,
       )
       resolvedConfig = null

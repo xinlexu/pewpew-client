@@ -19,7 +19,7 @@
         "traffic": "Tarjeta de estadísticas de tráfico",
         "tests": "Tarjeta de pruebas de sitios web",
         "ip": "Tarjeta de información de IP",
-        "clashInfo": "Tarjetas de información de Clash",
+        "clashInfo": "Tarjetas de información de Connection Core",
         "systemInfo": "Tarjetas de información del sistema"
       },
       "title": "Configuración de la página de inicio"
@@ -41,7 +41,7 @@
       }
     },
     "clashInfo": {
-      "title": "Información de Clash",
+      "title": "Información de Connection Core",
       "fields": {
         "coreVersion": "Versión del núcleo",
         "systemProxyAddress": "Dirección del proxy del sistema",
@@ -57,7 +57,7 @@
         "autoLaunch": "Inicio automático al arrancar el sistema",
         "runningMode": "Modo de ejecución",
         "lastCheckUpdate": "Última comprobación de actualizaciones",
-        "vergeVersion": "Versión de Verge"
+        "vergeVersion": "Versión de PewPew Cloud"
       },
       "actions": {
         "settings": "Ajustes"

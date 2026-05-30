@@ -22,18 +22,18 @@ notifications:
     body: プロファイルが再有効化されました。
   appQuit:
     title: 終了間近
-    body: Clash Verge はまもなく終了します。
+    body: PewPew Cloud is about to exit.
   appHidden:
     title: アプリが非表示
-    body: Clash Verge はバックグラウンドで実行中です。
+    body: PewPew Cloud is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: PewPew Cloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash Verge サービスのインストールには管理者権限が必要です。
-  adminUninstallPrompt: Clash Verge サービスのアンインストールには管理者権限が必要です。
+  adminInstallPrompt: Installing the PewPew Background Service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the PewPew Background Service requires administrator privileges.
 tray:
   dashboard: ダッシュボード
   ruleMode: ルールモード
@@ -62,9 +62,9 @@ tray:
   openDir: ディレクトリを開く
   appLog: アプリケーションログ
   coreLog: コアログ
-  restartClash: Clash コアを再起動
+  restartClash: Restart Connection Core
   restartApp: アプリケーションを再起動
-  vergeVersion: Verge バージョン
+  vergeVersion: PewPew Cloud Version
   more: その他
   exit: 終了
   tooltip:

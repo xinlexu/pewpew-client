@@ -90,7 +90,7 @@
       "system": "시스템"
     },
     "clash": {
-      "title": "Clash 설정",
+      "title": "Connection Core 설정",
       "form": {
         "fields": {
           "allowLan": "LAN 허용",
@@ -101,7 +101,7 @@
           "portConfig": "포트 설정",
           "external": "외부",
           "webUI": "Web UI",
-          "clashCore": "Clash 코어",
+          "clashCore": "Connection Core 코어",
           "openUwpTool": "UWP 도구 열기",
           "updateGeoData": "GeoData 업데이트",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Verge 기본 설정",
+        "title": "PewPew Cloud 기본 설정",
         "actions": {
           "browse": "찾아보기"
         },
@@ -173,7 +173,7 @@
         }
       },
       "advanced": {
-        "title": "Verge 고급 설정",
+        "title": "PewPew Cloud 고급 설정",
         "tooltips": {
           "backupInfo": "설정 파일의 로컬 또는 WebDAV 백업을 지원합니다",
           "openConfDir": "소프트웨어가 비정상 동작할 경우, 이 폴더의 파일을 백업 후 모두 삭제하고 재시작하세요",
@@ -197,7 +197,7 @@
           "liteModeSettings": "경량 모드 설정",
           "exit": "종료",
           "exportDiagnostics": "진단 정보 내보내기",
-          "vergeVersion": "Verge 버전"
+          "vergeVersion": "PewPew Cloud 버전"
         }
       },
       "theme": {
@@ -624,7 +624,7 @@
   "feedback": {
     "notifications": {
       "clash": {
-        "restartSuccess": "Clash 코어가 재시작되었습니다",
+        "restartSuccess": "Connection Core 코어가 재시작되었습니다",
         "versionUpdated": "코어 버전이 업데이트되었습니다",
         "alreadyLatestVersion": "이미 최신 코어 버전을 사용 중입니다",
         "changeSuccess": "코어 변경 성공",
@@ -636,8 +636,8 @@
         "uninstallSuccess": "서비스가 제거되었습니다"
       },
       "updater": {
-        "withClashProxySuccess": "Clash 프록시로 업데이트 성공",
-        "withClashProxyFailed": "Clash 프록시로도 업데이트 실패"
+        "withClashProxySuccess": "Connection Core 프록시로 업데이트 성공",
+        "withClashProxyFailed": "Connection Core 프록시로도 업데이트 실패"
       }
     }
   },

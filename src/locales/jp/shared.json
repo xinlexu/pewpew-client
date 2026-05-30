@@ -84,7 +84,7 @@
     "notifications": {
       "importSuccess": "プロファイルのインポートに成功しました。",
       "importSubscriptionSuccess": "サブスクリプションのインポートに成功しました。",
-      "importWithClashProxy": "Clashプロキシを使用してプロファイルのインポートに成功しました。",
+      "importWithClashProxy": "Connection Coreプロキシを使用してプロファイルのインポートに成功しました。",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {

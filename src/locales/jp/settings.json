@@ -90,7 +90,7 @@
       "system": "System"
     },
     "clash": {
-      "title": "Clash設定",
+      "title": "Connection Core設定",
       "form": {
         "fields": {
           "allowLan": "LAN接続を許可",
@@ -101,7 +101,7 @@
           "portConfig": "ポート設定",
           "external": "外部制御",
           "webUI": "Webインターフェース",
-          "clashCore": "Clashコア",
+          "clashCore": "Connection Coreコア",
           "openUwpTool": "UWPツールを開く",
           "updateGeoData": "GeoDataを更新",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Verge基本設定",
+        "title": "PewPew Cloud基本設定",
         "actions": {
           "browse": "参照"
         },
@@ -173,7 +173,7 @@
         }
       },
       "advanced": {
-        "title": "Verge詳細設定",
+        "title": "PewPew Cloud詳細設定",
         "tooltips": {
           "backupInfo": "WebDAVを使用した設定ファイルのバックアップをサポートします。",
           "openConfDir": "アプリケーションが正常に動作しない場合は、このフォルダ内のすべてのファイルを!バックアップ!して削除し、アプリケーションを再起動してください。",
@@ -197,7 +197,7 @@
           "liteModeSettings": "軽量モード設定",
           "exit": "終了",
           "exportDiagnostics": "診断情報をエクスポート",
-          "vergeVersion": "Vergeバージョン"
+          "vergeVersion": "PewPew Cloudバージョン"
         }
       },
       "theme": {
@@ -624,7 +624,7 @@
   "feedback": {
     "notifications": {
       "clash": {
-        "restartSuccess": "Clashコアが再起動されました。",
+        "restartSuccess": "Connection Coreコアが再起動されました。",
         "versionUpdated": "コアバージョンが更新されました。",
         "alreadyLatestVersion": "すでに最新のコアバージョンを使用しています。",
         "changeSuccess": "コアの切り替えに成功しました。",
@@ -636,8 +636,8 @@
         "uninstallSuccess": "サービスのアンインストールに成功しました。"
       },
       "updater": {
-        "withClashProxySuccess": "Clashプロキシを使用して更新に成功しました。",
-        "withClashProxyFailed": "Clashプロキシを使用しても更新に失敗しました。"
+        "withClashProxySuccess": "Connection Coreプロキシを使用して更新に成功しました。",
+        "withClashProxyFailed": "Connection Coreプロキシを使用しても更新に失敗しました。"
       }
     }
   },

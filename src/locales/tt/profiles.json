@@ -31,8 +31,8 @@
         "onlyYaml": "Фәкать YAML-файллар гына хуплана"
       },
       "notifications": {
-        "importRetry": "Import failed, retrying with Clash proxy...",
-        "importFail": "Import failed even with Clash proxy",
+        "importRetry": "Import failed, retrying with core proxy...",
+        "importFail": "Import failed even with core proxy",
         "importNeedsRefresh": "Profile imported but may need manual refresh",
         "importSuccess": "Profile imported successfully, please restart if not visible",
         "profileSwitched": "Профиль алмаштырылды",
@@ -108,14 +108,14 @@
         "httpTimeout": "HTTP Request Timeout",
         "updateInterval": "Яңарту интервалы",
         "useSystemProxy": "Системалы проксины кулланып яңарту",
-        "useClashProxy": "Clash прокси кулланып яңарту",
+        "useClashProxy": "Connection Core прокси кулланып яңарту",
         "acceptInvalidCerts": "Дөрес булмаган сертификатларны кабул итү (Куркыныч)",
         "allowAutoUpdate": "Allow Auto Update"
       },
       "feedback": {
         "notifications": {
-          "creationRetry": "Profile creation failed, retrying with Clash proxy...",
-          "creationSuccess": "Profile creation succeeded with Clash proxy"
+          "creationRetry": "Profile creation failed, retrying with core proxy...",
+          "creationSuccess": "Profile creation succeeded with core proxy"
         }
       }
     },

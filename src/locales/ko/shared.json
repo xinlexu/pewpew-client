@@ -84,7 +84,7 @@
     "notifications": {
       "importSuccess": "프로필 가져오기 성공",
       "importSubscriptionSuccess": "구독 가져오기 성공",
-      "importWithClashProxy": "Clash 프록시로 프로필 가져오기",
+      "importWithClashProxy": "Connection Core 프록시로 프로필 가져오기",
       "updateAvailable": "업데이트 가능",
       "saved": "저장되었습니다",
       "common": {

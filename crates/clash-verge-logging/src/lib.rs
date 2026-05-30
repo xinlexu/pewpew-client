@@ -55,7 +55,7 @@ impl fmt::Display for Type {
             Self::Network => write!(f, "[Network]"),
             Self::ProxyMode => write!(f, "[ProxMode]"),
             Self::Validate => write!(f, "[Validate]"),
-            Self::ClashVergeRev => write!(f, "[ClashVergeRev]"),
+            Self::ClashVergeRev => write!(f, "[PewPewClient]"),
         }
     }
 }

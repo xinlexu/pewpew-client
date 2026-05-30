@@ -19,7 +19,7 @@
         "traffic": "Verkehrsstatistik-Karte",
         "tests": "Website-Tests-Karte",
         "ip": "IP-Informationen-Karte",
-        "clashInfo": "Clash-Informationen-Karten",
+        "clashInfo": "Connection Core-Informationen-Karten",
         "systemInfo": "Systeminformationen-Karten"
       },
       "title": "Startseite-Einstellungen"
@@ -41,7 +41,7 @@
       }
     },
     "clashInfo": {
-      "title": "Clash-Informationen",
+      "title": "Connection Core-Informationen",
       "fields": {
         "coreVersion": "Kernversion",
         "systemProxyAddress": "Systemproxy-Adresse",
@@ -57,7 +57,7 @@
         "autoLaunch": "Beim Start automatisch starten",
         "runningMode": "Betriebsmodus",
         "lastCheckUpdate": "Letzte Aktualitätsprüfung",
-        "vergeVersion": "Verge-Version"
+        "vergeVersion": "PewPew Cloud-Version"
       },
       "actions": {
         "settings": "Einstellungen"

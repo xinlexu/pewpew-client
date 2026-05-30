@@ -31,8 +31,8 @@
         "onlyYaml": "仅支持 YAML 文件"
       },
       "notifications": {
-        "importRetry": "订阅导入失败，尝试使用 Clash 代理导入",
-        "importFail": "使用 Clash 代理导入订阅失败",
+        "importRetry": "订阅导入失败，尝试使用核心代理导入",
+        "importFail": "使用核心代理导入订阅失败",
         "importNeedsRefresh": "订阅已导入，但可能需要手动刷新",
         "importSuccess": "订阅已成功导入，如未显示请重启应用",
         "profileSwitched": "订阅已切换",
@@ -114,8 +114,8 @@
       },
       "feedback": {
         "notifications": {
-          "creationRetry": "订阅创建失败，尝试使用 Clash 代理创建",
-          "creationSuccess": "使用 Clash 代理创建订阅成功"
+          "creationRetry": "订阅创建失败，尝试使用核心代理创建",
+          "creationSuccess": "使用核心代理创建订阅成功"
         }
       }
     },

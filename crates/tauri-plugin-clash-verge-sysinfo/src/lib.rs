@@ -88,7 +88,7 @@ impl Display for Platform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "System Name: {}\nSystem Version: {}\nSystem kernel Version: {}\nSystem Arch: {}\nVerge Version: {}\nRunning Mode: {}\nIs Admin: {}",
+            "System Name: {}\nSystem Version: {}\nSystem kernel Version: {}\nSystem Arch: {}\nPewPew Cloud Version: {}\nRunning Mode: {}\nIs Admin: {}",
             self.sysinfo.system_name,
             self.sysinfo.system_version,
             self.sysinfo.system_kernel_version,

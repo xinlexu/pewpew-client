@@ -22,18 +22,18 @@ notifications:
     body: پروفایل دوباره فعال شد.
   appQuit:
     title: در آستانه خروج
-    body: Clash Verge در آستانه خروج است.
+    body: PewPew Cloud is about to exit.
   appHidden:
     title: برنامه پنهان شد
-    body: Clash Verge در پس‌زمینه در حال اجراست.
+    body: PewPew Cloud is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: PewPew Cloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: نصب سرویس Clash Verge به دسترسی مدیر نیاز دارد.
-  adminUninstallPrompt: حذف سرویس Clash Verge به دسترسی مدیر نیاز دارد.
+  adminInstallPrompt: Installing the PewPew Background Service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the PewPew Background Service requires administrator privileges.
 tray:
   dashboard: داشبورد
   ruleMode: حالت قوانین
@@ -62,9 +62,9 @@ tray:
   openDir: باز کردن پوشه
   appLog: گزارش برنامه
   coreLog: گزارش هسته
-  restartClash: راه‌اندازی مجدد هسته Clash
+  restartClash: Restart Connection Core
   restartApp: راه‌اندازی مجدد برنامه
-  vergeVersion: نسخه Verge
+  vergeVersion: PewPew Cloud Version
   more: بیشتر
   exit: خروج
   tooltip:

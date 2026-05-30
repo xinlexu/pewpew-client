@@ -22,18 +22,18 @@ notifications:
     body: Профиль яңадан активлаштырылды.
   appQuit:
     title: Чыгар алдыннан
-    body: Clash Verge чыгарга җыена.
+    body: PewPew Cloud is about to exit.
   appHidden:
     title: Кушымта яшерелде
-    body: Clash Verge фон режимында эшли.
+    body: PewPew Cloud is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: PewPew Cloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash Verge хезмәтен урнаштыру өчен администратор хокуклары кирәк.
-  adminUninstallPrompt: Clash Verge хезмәтен бетерү өчен администратор хокуклары кирәк.
+  adminInstallPrompt: Installing the PewPew Background Service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the PewPew Background Service requires administrator privileges.
 tray:
   dashboard: Идарә панеле
   ruleMode: Кагыйдә режимы
@@ -62,9 +62,9 @@ tray:
   openDir: Каталогны ачу
   appLog: Кушымта журналы
   coreLog: Ядро журналы
-  restartClash: Clash ядрәсен кабат җибәрү
+  restartClash: Restart Connection Core
   restartApp: Кушымтаны кабат җибәрү
-  vergeVersion: Verge версиясе
+  vergeVersion: PewPew Cloud Version
   more: Күбрәк
   exit: Чыгу
   tooltip:

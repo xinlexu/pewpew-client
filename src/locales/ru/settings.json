@@ -90,7 +90,7 @@
       "system": "Системная"
     },
     "clash": {
-      "title": "Настройки Clash",
+      "title": "Настройки Connection Core",
       "form": {
         "fields": {
           "allowLan": "Разрешить доступ из локальной сети",
@@ -101,7 +101,7 @@
           "portConfig": "Настройка порта",
           "external": "Внешний контроллер",
           "webUI": "Веб-интерфейс",
-          "clashCore": "Ядро Clash",
+          "clashCore": "Ядро Connection Core",
           "openUwpTool": "Открыть инструмент UWP",
           "updateGeoData": "Обновить GeoData",
           "tunnels": {
@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Основные настройки Verge",
+        "title": "Основные настройки PewPew Cloud",
         "actions": {
           "browse": "Просмотреть"
         },
@@ -173,11 +173,11 @@
         }
       },
       "advanced": {
-        "title": "Расширенные настройки Verge",
+        "title": "Расширенные настройки PewPew Cloud",
         "tooltips": {
           "backupInfo": "Поддерживается резервное копирование файлов конфигурации через WebDAV",
           "openConfDir": "Если программа работает неправильно, сделайте резервную копию и удалите все файлы в этой папке, затем перезапустите приложение",
-          "liteMode": "Режим, в котором работает только ядро Clash, а графический интерфейс закрыт"
+          "liteMode": "Режим, в котором работает только ядро Connection Core, а графический интерфейс закрыт"
         },
         "actions": {
           "copyVersion": "Копировать версию"
@@ -197,7 +197,7 @@
           "liteModeSettings": "Настройки режима LightWeight",
           "exit": "Выход",
           "exportDiagnostics": "Экспорт диагностической информации",
-          "vergeVersion": "Версия Clash Verge Rev"
+          "vergeVersion": "Версия PewPew Cloud Client"
         }
       },
       "theme": {
@@ -636,8 +636,8 @@
         "uninstallSuccess": "Служба успешно удалена"
       },
       "updater": {
-        "withClashProxySuccess": "Обновление через Clash proxy выполнено успешно",
-        "withClashProxyFailed": "Обновление не удалось даже через Clash proxy"
+        "withClashProxySuccess": "Обновление через core proxy выполнено успешно",
+        "withClashProxyFailed": "Обновление не удалось даже через core proxy"
       }
     }
   },

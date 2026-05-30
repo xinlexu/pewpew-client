@@ -31,8 +31,8 @@
         "onlyYaml": "Solo se admiten archivos YAML"
       },
       "notifications": {
-        "importRetry": "Error al importar la suscripción. Intentando con el proxy de Clash...",
-        "importFail": "Error al importar incluso con el proxy de Clash",
+        "importRetry": "Error al importar la suscripción. Intentando con el proxy de Connection Core...",
+        "importFail": "Error al importar incluso con el proxy de Connection Core",
         "importNeedsRefresh": "Profile imported but may need manual refresh",
         "importSuccess": "Profile imported successfully, please restart if not visible",
         "profileSwitched": "Suscripción cambiada",
@@ -114,8 +114,8 @@
       },
       "feedback": {
         "notifications": {
-          "creationRetry": "Error al crear la suscripción. Intentando con el proxy de Clash...",
-          "creationSuccess": "Creación de la suscripción con el proxy de Clash exitosa"
+          "creationRetry": "Error al crear la suscripción. Intentando con el proxy de Connection Core...",
+          "creationSuccess": "Creación de la suscripción con el proxy de Connection Core exitosa"
         }
       }
     },

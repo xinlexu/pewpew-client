@@ -31,8 +31,8 @@
         "onlyYaml": "لا يتم دعم سوى ملفات YAML"
       },
       "notifications": {
-        "importRetry": "Import failed, retrying with Clash proxy...",
-        "importFail": "Import failed even with Clash proxy",
+        "importRetry": "Import failed, retrying with core proxy...",
+        "importFail": "Import failed even with core proxy",
         "importNeedsRefresh": "Profile imported but may need manual refresh",
         "importSuccess": "Profile imported successfully, please restart if not visible",
         "profileSwitched": "تم التبديل إلى الملف الشخصي",
@@ -108,14 +108,14 @@
         "httpTimeout": "HTTP Request Timeout",
         "updateInterval": "فاصل التحديث",
         "useSystemProxy": "استخدام وكيل النظام",
-        "useClashProxy": "استخدام وكيل Clash",
+        "useClashProxy": "استخدام وكيل Connection Core",
         "acceptInvalidCerts": "قبول الشهادات غير الصالحة (خطر)",
         "allowAutoUpdate": "Allow Auto Update"
       },
       "feedback": {
         "notifications": {
-          "creationRetry": "Profile creation failed, retrying with Clash proxy...",
-          "creationSuccess": "Profile creation succeeded with Clash proxy"
+          "creationRetry": "Profile creation failed, retrying with core proxy...",
+          "creationSuccess": "Profile creation succeeded with core proxy"
         }
       }
     },

@@ -19,7 +19,7 @@
         "traffic": "Traffic Stats Card",
         "tests": "Website Tests Card",
         "ip": "IP Information Card",
-        "clashInfo": "Clash Info Cards",
+        "clashInfo": "Core Info Cards",
         "systemInfo": "System Info Cards"
       },
       "title": "Home Settings"
@@ -41,7 +41,7 @@
       }
     },
     "clashInfo": {
-      "title": "Clash Info",
+      "title": "Core Info",
       "fields": {
         "coreVersion": "Core Version",
         "systemProxyAddress": "System Proxy Address",
@@ -57,7 +57,7 @@
         "autoLaunch": "راه‌اندازی خودکار",
         "runningMode": "Running Mode",
         "lastCheckUpdate": "Last Check Update",
-        "vergeVersion": "نسخه Verge"
+        "vergeVersion": "نسخه PewPew Cloud"
       },
       "actions": {
         "settings": "تنظیمات"

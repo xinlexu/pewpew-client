@@ -31,8 +31,8 @@
         "onlyYaml": "Yalnızca YAML Dosyaları Desteklenir"
       },
       "notifications": {
-        "importRetry": "İçe aktarma başarısız oldu, Clash vekil ile yeniden deneniyor...",
-        "importFail": "Clash vekil ile bile içe aktarma başarısız oldu",
+        "importRetry": "İçe aktarma başarısız oldu, Connection Core vekil ile yeniden deneniyor...",
+        "importFail": "Connection Core vekil ile bile içe aktarma başarısız oldu",
         "importNeedsRefresh": "Profile imported but may need manual refresh",
         "importSuccess": "Profile imported successfully, please restart if not visible",
         "profileSwitched": "Profil Değiştirildi",
@@ -108,14 +108,14 @@
         "httpTimeout": "HTTP Request Timeout",
         "updateInterval": "Güncelleme Aralığı",
         "useSystemProxy": "Sistem Vekil'ini Kullan",
-        "useClashProxy": "Clash Vekil'ini Kullan",
+        "useClashProxy": "Connection Core Vekil'ini Kullan",
         "acceptInvalidCerts": "Geçersiz Sertifikalara İzin Ver (Tehlikeli)",
         "allowAutoUpdate": "Allow Auto Update"
       },
       "feedback": {
         "notifications": {
-          "creationRetry": "Profil oluşturma başarısız oldu, Clash vekil ile yeniden deneniyor...",
-          "creationSuccess": "Clash vekil ile profil oluşturma başarılı oldu"
+          "creationRetry": "Profil oluşturma başarısız oldu, Connection Core vekil ile yeniden deneniyor...",
+          "creationSuccess": "Connection Core vekil ile profil oluşturma başarılı oldu"
         }
       }
     },

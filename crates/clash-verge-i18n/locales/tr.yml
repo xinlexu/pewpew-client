@@ -22,18 +22,18 @@ notifications:
     body: Profil yeniden etkinleştirildi.
   appQuit:
     title: Çıkış Yapılmak Üzere
-    body: Clash Verge kapanmak üzere.
+    body: PewPew Cloud is about to exit.
   appHidden:
     title: Uygulama Gizlendi
-    body: Clash Verge arka planda çalışıyor.
+    body: PewPew Cloud is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: PewPew Cloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash Verge hizmetini kurmak için yönetici ayrıcalıkları gerekir.
-  adminUninstallPrompt: Clash Verge hizmetini kaldırmak için yönetici ayrıcalıkları gerekir.
+  adminInstallPrompt: Installing the PewPew Background Service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the PewPew Background Service requires administrator privileges.
 tray:
   dashboard: Gösterge Paneli
   ruleMode: Kural Modu
@@ -62,9 +62,9 @@ tray:
   openDir: Dizini Aç
   appLog: Uygulama Günlüğü
   coreLog: Çekirdek Günlüğü
-  restartClash: Clash Çekirdeğini Yeniden Başlat
+  restartClash: Restart Connection Core
   restartApp: Uygulamayı Yeniden Başlat
-  vergeVersion: Verge Sürümü
+  vergeVersion: PewPew Cloud Version
   more: Daha Fazla
   exit: Çıkış
   tooltip:
