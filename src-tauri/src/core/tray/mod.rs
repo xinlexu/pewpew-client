@@ -83,6 +83,12 @@ impl TrayState {
         Self::default_icon(verge, kind)
     }
 
+    #[cfg(target_os = "windows")]
+    fn default_icon(_verge: &IVerge, _kind: IconKind) -> (bool, Vec<u8>) {
+        (false, include_bytes!("../../../icons/icon.ico").to_vec())
+    }
+
+    #[cfg(not(target_os = "windows"))]
     fn default_icon(verge: &IVerge, kind: IconKind) -> (bool, Vec<u8>) {
         #[cfg(target_os = "macos")]
         {

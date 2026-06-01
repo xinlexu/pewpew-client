@@ -254,13 +254,14 @@ impl NetworkManager {
 
         let mut headers = HeaderMap::new();
 
-        // 设置 User-Agent
+        // Keep a Clash Verge-compatible UA for subscription servers that gate
+        // YAML output by client type. This is protocol compatibility, not UI branding.
         if let Some(ua) = user_agent {
             headers.insert(USER_AGENT, HeaderValue::from_str(ua.as_str())?);
         } else {
             headers.insert(
                 USER_AGENT,
-                HeaderValue::from_str(&format!("pewpew-client/v{}", env!("CARGO_PKG_VERSION")))?,
+                HeaderValue::from_str(&format!("clash-verge/v{}", env!("CARGO_PKG_VERSION")))?,
             );
         }
 

@@ -33,6 +33,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ClipboardEvent,
   type RefObject,
 } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -64,6 +65,10 @@ import { showNotice } from '@/services/notice-service'
 import { queryClient } from '@/services/query-client'
 import { useSetLoadingCache, useThemeMode } from '@/services/states'
 import { debugLog } from '@/utils/debug'
+import {
+  isSubscriptionUrl,
+  normalizeSubscriptionUrlInput,
+} from '@/utils/subscription-url'
 
 // 记录profile切换状态
 const debugProfileSwitch = (action: string, profile: string, extra?: any) => {
@@ -279,9 +284,12 @@ const ProfilePage = () => {
   }
 
   const onImport = async () => {
-    if (!url) return
+    const normalizedUrl = normalizeSubscriptionUrlInput(url)
+    if (normalizedUrl !== url) setUrl(normalizedUrl)
+
+    if (!normalizedUrl) return
     // 校验url是否为http/https
-    if (!/^https?:\/\//i.test(url)) {
+    if (!isSubscriptionUrl(normalizedUrl)) {
       showNotice.error('profiles.page.feedback.errors.invalidUrl')
       return
     }
@@ -295,7 +303,7 @@ const ProfilePage = () => {
 
     try {
       // 尝试正常导入
-      await importProfile(url)
+      await importProfile(normalizedUrl)
       await handleImportSuccess('shared.feedback.notifications.importSuccess')
     } catch (initialErr) {
       console.warn('[订阅导入] 首次导入失败:', initialErr)
@@ -303,7 +311,7 @@ const ProfilePage = () => {
       showNotice.info('profiles.page.feedback.notifications.importRetry')
       try {
         // 使用自身代理尝试导入
-        await importProfile(url, {
+        await importProfile(normalizedUrl, {
           with_proxy: false,
           self_proxy: true,
         })
@@ -651,8 +659,19 @@ const ProfilePage = () => {
 
   const onCopyLink = async () => {
     const text = await readText()
-    if (text) setUrl(text)
+    const nextUrl = normalizeSubscriptionUrlInput(text)
+    if (nextUrl) setUrl(nextUrl)
   }
+
+  const onUrlPaste = useCallback((event: ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = event.clipboardData.getData('text')
+    const nextUrl = normalizeSubscriptionUrlInput(pastedText)
+
+    if (!nextUrl || nextUrl === pastedText) return
+
+    event.preventDefault()
+    setUrl(nextUrl)
+  }, [])
 
   // Batch selection functions
   const toggleBatchMode = () => {
@@ -933,6 +952,7 @@ const ProfilePage = () => {
           value={url}
           variant="outlined"
           onChange={(e) => setUrl(e.target.value)}
+          onPaste={onUrlPaste}
           onKeyDown={(event) => {
             if (event.key !== 'Enter' || event.nativeEvent.isComposing) {
               return

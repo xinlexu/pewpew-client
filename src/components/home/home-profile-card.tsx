@@ -1,5 +1,7 @@
 import {
   CloudUploadOutlined,
+  ClearRounded,
+  ContentPasteRounded,
   DescriptionOutlined,
   UpdateOutlined,
 } from '@mui/icons-material'
@@ -7,6 +9,8 @@ import {
   Box,
   Button,
   Divider,
+  IconButton,
+  InputAdornment,
   Paper,
   Stack,
   TextField,
@@ -14,12 +18,21 @@ import {
   alpha,
 } from '@mui/material'
 import { listen, TauriEvent } from '@tauri-apps/api/event'
+import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import yaml from 'js-yaml'
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type DragEvent,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
@@ -40,6 +53,10 @@ import {
   countDisplayRoutesFromConfig,
   resolvePewPewProxyGroup,
 } from '@/utils/pewpew-client'
+import {
+  isSubscriptionUrl,
+  normalizeSubscriptionUrlInput,
+} from '@/utils/subscription-url'
 
 interface HomeProfileCardProps {
   current: IProfileItem | null | undefined
@@ -47,20 +64,34 @@ interface HomeProfileCardProps {
   onSyncingChange?: (syncing: boolean) => void
 }
 
-const isSubscriptionUrl = (value: string) => /^https?:\/\//i.test(value)
 const isYamlPath = (value: string) => /\.ya?ml$/i.test(value)
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
+const getCreatedProfile = (
+  before: IProfilesConfig,
+  after: IProfilesConfig,
+  type: IProfileItem['type'],
+) => {
+  const beforeUids = new Set((before.items || []).map((item) => item.uid))
+  return (after.items || [])
+    .filter((item) => item.type === type && !beforeUids.has(item.uid))
+    .sort((a, b) => (b.updated || 0) - (a.updated || 0))[0]
+}
+
 const getCreatedLocalProfile = (
   before: IProfilesConfig,
   after: IProfilesConfig,
 ) => {
-  const beforeUids = new Set((before.items || []).map((item) => item.uid))
-  return (after.items || [])
-    .filter((item) => item.type === 'local' && !beforeUids.has(item.uid))
-    .sort((a, b) => (b.updated || 0) - (a.updated || 0))[0]
+  return getCreatedProfile(before, after, 'local')
+}
+
+const getCreatedRemoteProfile = (
+  before: IProfilesConfig,
+  after: IProfilesConfig,
+) => {
+  return getCreatedProfile(before, after, 'remote')
 }
 
 type StatusMessage =
@@ -161,8 +192,45 @@ export const HomeProfileCard = ({
     }
   }
 
+  const handlePasteSubscription = useLockFn(async () => {
+    try {
+      const text = await readText()
+      const nextUrl = normalizeSubscriptionUrlInput(text)
+
+      if (!nextUrl) {
+        setStatusKey('home.pewpew.subscription.pasteFirst')
+        return
+      }
+
+      setSubscriptionUrl(nextUrl)
+      setStatusMessage({ type: 'empty' })
+
+      if (!isSubscriptionUrl(nextUrl)) {
+        setStatusKey('home.pewpew.subscription.invalidUrl')
+      }
+    } catch (err) {
+      console.warn('[PewPew] 剪贴板读取失败:', err)
+      setStatusKey('home.pewpew.subscription.pasteFirst')
+    }
+  })
+
+  const handleSubscriptionPaste = useCallback(
+    (event: ClipboardEvent<HTMLInputElement>) => {
+      const pastedText = event.clipboardData.getData('text')
+      const nextUrl = normalizeSubscriptionUrlInput(pastedText)
+
+      if (!nextUrl || nextUrl === pastedText) return
+
+      event.preventDefault()
+      setSubscriptionUrl(nextUrl)
+      setStatusMessage({ type: 'empty' })
+    },
+    [],
+  )
+
   const handleImport = useLockFn(async () => {
-    const url = subscriptionUrl.trim()
+    const url = normalizeSubscriptionUrlInput(subscriptionUrl)
+    if (url !== subscriptionUrl) setSubscriptionUrl(url)
 
     if (!url) {
       setStatusKey('home.pewpew.subscription.pasteFirst')
@@ -177,13 +245,26 @@ export const HomeProfileCard = ({
     setSyncingState(true)
 
     try {
-      const closedNetwork = await closeNetworkBeforeSync()
-      setStatusKey(
-        closedNetwork
-          ? 'home.pewpew.subscription.temporarilyStopped'
-          : 'home.pewpew.subscription.importing',
-      )
+      setStatusKey('home.pewpew.subscription.importing')
+      const beforeProfiles = await getProfiles()
       await importLineWithFallback(url)
+      const afterProfiles = await getProfiles()
+      const createdProfile = getCreatedRemoteProfile(
+        beforeProfiles,
+        afterProfiles,
+      )
+      if (!createdProfile?.uid) {
+        throw new Error('remote-profile-not-found')
+      }
+
+      const switched = await patchProfilesConfig({
+        current: createdProfile.uid,
+      } as IProfilesConfig)
+      if (!switched) {
+        throw new Error('profile-switch-failed')
+      }
+
+      await closeNetworkBeforeSync()
       await refreshSubscription()
       setSubscriptionUrl('')
       setStatusKey('home.pewpew.subscription.importSuccess')
@@ -206,13 +287,9 @@ export const HomeProfileCard = ({
     setSyncingState(true)
 
     try {
-      const closedNetwork = await closeNetworkBeforeSync()
-      setStatusKey(
-        closedNetwork
-          ? 'home.pewpew.subscription.temporarilyStopped'
-          : 'home.pewpew.subscription.updating',
-      )
+      setStatusKey('home.pewpew.subscription.updating')
       await updateProfile(current.uid, current.option)
+      await closeNetworkBeforeSync()
       await refreshSubscription()
       setStatusKey('home.pewpew.subscription.updateSuccess')
       showNotice.success(t('home.pewpew.subscription.updateSuccess'))
@@ -536,6 +613,41 @@ export const HomeProfileCard = ({
           placeholder={t('home.pewpew.subscription.placeholder')}
           value={subscriptionUrl}
           onChange={(event) => setSubscriptionUrl(event.target.value)}
+          onPaste={handleSubscriptionPaste}
+          slotProps={{
+            input: {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    edge="end"
+                    title={t('profiles.page.importForm.actions.paste')}
+                    aria-label={t('profiles.page.importForm.actions.paste')}
+                    disabled={syncing}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      void handlePasteSubscription()
+                    }}
+                  >
+                    <ContentPasteRounded fontSize="inherit" />
+                  </IconButton>
+                  {subscriptionUrl && (
+                    <IconButton
+                      size="small"
+                      edge="end"
+                      title={t('shared.actions.clear')}
+                      aria-label={t('shared.actions.clear')}
+                      disabled={syncing}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => setSubscriptionUrl('')}
+                    >
+                      <ClearRounded fontSize="inherit" />
+                    </IconButton>
+                  )}
+                </InputAdornment>
+              ),
+            },
+          }}
           sx={{
             '& .MuiOutlinedInput-root': {
               borderRadius: 2.5,

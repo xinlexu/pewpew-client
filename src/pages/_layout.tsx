@@ -287,13 +287,12 @@ const Layout = () => {
           borderTopRightRadius: '0px',
         }}
         onContextMenu={(e) => {
-          if (
-            OS === 'windows' &&
-            !['input', 'textarea'].includes(
-              e.currentTarget.tagName.toLowerCase(),
-            ) &&
-            !e.currentTarget.isContentEditable
-          ) {
+          const target = e.target
+          const allowsNativeContextMenu =
+            target instanceof HTMLElement &&
+            !!target.closest('input, textarea, [contenteditable="true"]')
+
+          if (OS === 'windows' && !allowsNativeContextMenu) {
             e.preventDefault()
           }
         }}
