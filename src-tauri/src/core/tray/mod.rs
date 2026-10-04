@@ -83,39 +83,8 @@ impl TrayState {
         Self::default_icon(verge, kind)
     }
 
-    #[cfg(target_os = "windows")]
     fn default_icon(_verge: &IVerge, _kind: IconKind) -> (bool, Vec<u8>) {
-        (false, include_bytes!("../../../icons/icon.ico").to_vec())
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    fn default_icon(verge: &IVerge, kind: IconKind) -> (bool, Vec<u8>) {
-        #[cfg(target_os = "macos")]
-        {
-            let is_mono = verge.tray_icon.as_deref().unwrap_or("monochrome") == "monochrome";
-            if is_mono {
-                return (
-                    false,
-                    match kind {
-                        IconKind::Common => include_bytes!("../../../icons/tray-icon-mono.ico").to_vec(),
-                        IconKind::SysProxy => include_bytes!("../../../icons/tray-icon-sys-mono-new.ico").to_vec(),
-                        IconKind::Tun => include_bytes!("../../../icons/tray-icon-tun-mono-new.ico").to_vec(),
-                    },
-                );
-            }
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        let _ = verge;
-
-        (
-            false,
-            match kind {
-                IconKind::Common => include_bytes!("../../../icons/tray-icon.ico").to_vec(),
-                IconKind::SysProxy => include_bytes!("../../../icons/tray-icon-sys.ico").to_vec(),
-                IconKind::Tun => include_bytes!("../../../icons/tray-icon-tun.ico").to_vec(),
-            },
-        )
+        (false, include_bytes!("../../../icons/32x32.png").to_vec())
     }
 }
 
@@ -260,8 +229,8 @@ impl Tray {
 
         #[cfg(target_os = "macos")]
         {
-            let is_colorful = verge.tray_icon.as_deref().unwrap_or("monochrome") == "colorful";
-            logging_error!(Type::Tray, tray.set_icon_as_template(!is_colorful));
+            let use_template = _is_custom_icon && verge.tray_icon.as_deref() == Some("monochrome");
+            logging_error!(Type::Tray, tray.set_icon_as_template(use_template));
         }
 
         Ok(())
@@ -360,7 +329,7 @@ impl Tray {
 
         let verge = Config::verge().await.data_arc();
 
-        let icon_bytes = TrayState::get_tray_icon(&verge).await.1;
+        let (_is_custom_icon, icon_bytes) = TrayState::get_tray_icon(&verge).await;
         let icon = tauri::image::Image::from_bytes(&icon_bytes)?;
 
         #[cfg(target_os = "linux")]
@@ -373,7 +342,7 @@ impl Tray {
         let mut builder = TrayIconBuilder::with_id("main").icon(icon).icon_as_template(false);
         #[cfg(target_os = "macos")]
         {
-            let is_monochrome = verge.tray_icon.as_ref().is_none_or(|v| v == "monochrome");
+            let is_monochrome = _is_custom_icon && verge.tray_icon.as_deref() == Some("monochrome");
             builder = builder.icon_as_template(is_monochrome);
         }
 

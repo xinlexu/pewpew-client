@@ -36,9 +36,10 @@ pub async fn check_singleton() -> Result<()> {
             #[cfg(not(target_os = "macos"))]
             {
                 let param = argvs[1].as_str();
-                if param.starts_with("clash:") {
+                if param.starts_with("clash:") || param.starts_with("clash-verge:") || param.starts_with("pewpew:") {
                     client
-                        .get(format!("http://127.0.0.1:{port}/commands/scheme?param={param}"))
+                        .get(format!("http://127.0.0.1:{port}/commands/scheme"))
+                        .query(&[("param", param)])
                         .send()
                         .await?;
                 }

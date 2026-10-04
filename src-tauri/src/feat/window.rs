@@ -101,11 +101,19 @@ pub async fn clean_async() -> bool {
         #[cfg(not(target_os = "windows"))]
         let stop_timeout = Duration::from_secs(3);
 
+        let _ = timeout(Duration::from_millis(500), async {
+            handle::Handle::mihomo().await.clear_all_ws_connections().await
+        })
+        .await;
         logging!(info, Type::System, "stop core");
         match timeout(stop_timeout, CoreManager::global().stop_core()).await {
-            Ok(_) => {
+            Ok(Ok(())) => {
                 logging!(info, Type::Window, "core已停止");
                 true
+            }
+            Ok(Err(err)) => {
+                logging!(warn, Type::Window, "连接核心停止失败: {err}");
+                false
             }
             Err(_) => {
                 logging!(

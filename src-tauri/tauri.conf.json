@@ -39,7 +39,7 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["clash", "clash-verge"]
+        "schemes": ["pewpew", "clash", "clash-verge"]
       }
     }
   },

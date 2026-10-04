@@ -36,7 +36,10 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
-import { useAppRefreshers } from '@/providers/app-data-context'
+import {
+  useAppRefreshers,
+  useClashConfigData,
+} from '@/providers/app-data-context'
 import {
   calcuProxies,
   createProfile,
@@ -62,6 +65,7 @@ interface HomeProfileCardProps {
   current: IProfileItem | null | undefined
   onProfileUpdated?: () => void | Promise<void>
   onSyncingChange?: (syncing: boolean) => void
+  busy?: boolean
 }
 
 const isYamlPath = (value: string) => /\.ya?ml$/i.test(value)
@@ -103,9 +107,11 @@ export const HomeProfileCard = ({
   current,
   onProfileUpdated,
   onSyncingChange,
+  busy = false,
 }: HomeProfileCardProps) => {
   const { i18n, t } = useTranslation()
   const { refreshAll } = useAppRefreshers()
+  const { clashConfig } = useClashConfigData()
   const {
     indicator: networkEnabled,
     configState: networkConfigEnabled,
@@ -117,6 +123,7 @@ export const HomeProfileCard = ({
     type: 'empty',
   })
   const [syncing, setSyncing] = useState(false)
+  const syncingRef = useRef(false)
   const [dragActive, setDragActive] = useState(false)
   const dragActiveRef = useRef(false)
   const dragDepthRef = useRef(0)
@@ -150,6 +157,7 @@ export const HomeProfileCard = ({
   }, [current, i18n.language, t])
 
   const setSyncingState = (value: boolean) => {
+    syncingRef.current = value
     setSyncing(value)
     onSyncingChange?.(value)
   }
@@ -167,6 +175,14 @@ export const HomeProfileCard = ({
     }
     await onProfileUpdated?.()
     await refreshAll()
+    const refreshedProxies = await calcuProxies()
+    queryClient.setQueryData(['getProxies'], refreshedProxies)
+    if (
+      resolvePewPewProxyGroup(refreshedProxies, clashConfig?.mode).options
+        .length === 0
+    ) {
+      throw new Error('no-routes')
+    }
   }
 
   const closeNetworkBeforeSync = async (
@@ -185,10 +201,11 @@ export const HomeProfileCard = ({
       await importProfile(url)
     } catch (firstError) {
       console.warn('[PewPew] 线路导入失败，尝试备用方式:', firstError)
-      await importProfile(url, {
-        with_proxy: false,
-        self_proxy: true,
-      })
+      try {
+        await importProfile(url, { with_proxy: false, self_proxy: true })
+      } catch {
+        await importProfile(url, { with_proxy: true, self_proxy: false })
+      }
     }
   }
 
@@ -229,6 +246,7 @@ export const HomeProfileCard = ({
   )
 
   const handleImport = useLockFn(async () => {
+    if (busy || syncingRef.current) return
     const url = normalizeSubscriptionUrlInput(subscriptionUrl)
     if (url !== subscriptionUrl) setSubscriptionUrl(url)
 
@@ -271,14 +289,19 @@ export const HomeProfileCard = ({
       showNotice.success(t('home.pewpew.subscription.importSuccess'))
     } catch (err) {
       console.error('[PewPew] 线路导入失败:', err)
-      setStatusKey('home.pewpew.subscription.importFailed')
-      showNotice.error(t('home.pewpew.subscription.importFailed'))
+      const key =
+        err instanceof Error && err.message === 'no-routes'
+          ? 'home.pewpew.connection.noAvailableRoutes'
+          : 'home.pewpew.subscription.importFailed'
+      setStatusKey(key)
+      showNotice.error(t(key))
     } finally {
       setSyncingState(false)
     }
   })
 
   const handleUpdate = useLockFn(async () => {
+    if (busy || syncingRef.current || current?.type !== 'remote') return
     if (!current?.uid) {
       setStatusKey('home.pewpew.connection.importFirst')
       return
@@ -304,6 +327,7 @@ export const HomeProfileCard = ({
 
   const importYamlText = useLockFn(
     async (fileData: string, source: 'dialog' | 'drop') => {
+      if (busy || syncingRef.current) return
       setSyncingState(true)
       setStatusKey('home.pewpew.subscription.yamlImporting')
 
@@ -387,7 +411,10 @@ export const HomeProfileCard = ({
 
         const refreshedProxies = await calcuProxies()
         queryClient.setQueryData(['getProxies'], refreshedProxies)
-        const refreshedRoutes = resolvePewPewProxyGroup(refreshedProxies)
+        const refreshedRoutes = resolvePewPewProxyGroup(
+          refreshedProxies,
+          clashConfig?.mode,
+        )
         if (refreshedRoutes.options.length === 0) {
           throw new Error('no-routes')
         }
@@ -490,7 +517,7 @@ export const HomeProfileCard = ({
       const unlistenDrop = await listen<{ paths?: string[] }>(
         TauriEvent.DRAG_DROP,
         (event) => {
-          if (disposed || !dragActiveRef.current) return
+          if (disposed || syncingRef.current || !dragActiveRef.current) return
           const firstYaml = event.payload.paths?.find(isYamlPath)
           if (firstYaml) {
             void importYamlFileFromPath(firstYaml, 'drop')
@@ -512,6 +539,12 @@ export const HomeProfileCard = ({
     }
 
     void setup()
+      .then(() => {
+        if (disposed) cleanups.forEach((cleanup) => cleanup())
+      })
+      .catch(() => {
+        cleanups.forEach((cleanup) => cleanup())
+      })
 
     return () => {
       disposed = true
@@ -623,7 +656,7 @@ export const HomeProfileCard = ({
                     edge="end"
                     title={t('profiles.page.importForm.actions.paste')}
                     aria-label={t('profiles.page.importForm.actions.paste')}
-                    disabled={syncing}
+                    disabled={syncing || busy}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
                       void handlePasteSubscription()
@@ -637,7 +670,7 @@ export const HomeProfileCard = ({
                       edge="end"
                       title={t('shared.actions.clear')}
                       aria-label={t('shared.actions.clear')}
-                      disabled={syncing}
+                      disabled={syncing || busy}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => setSubscriptionUrl('')}
                     >
@@ -661,7 +694,7 @@ export const HomeProfileCard = ({
             fullWidth
             variant="contained"
             onClick={handleImport}
-            disabled={!canImport || syncing}
+            disabled={!canImport || syncing || busy}
             startIcon={<CloudUploadOutlined />}
             sx={{ borderRadius: 999, py: 1 }}
           >
@@ -671,7 +704,7 @@ export const HomeProfileCard = ({
             fullWidth
             variant="outlined"
             onClick={handleUpdate}
-            disabled={!current?.uid || syncing}
+            disabled={current?.type !== 'remote' || syncing || busy}
             startIcon={<UpdateOutlined />}
             sx={{ borderRadius: 999, py: 1 }}
           >
@@ -720,7 +753,7 @@ export const HomeProfileCard = ({
             <Button
               variant="outlined"
               onClick={handleImportYaml}
-              disabled={syncing}
+              disabled={syncing || busy}
               startIcon={<DescriptionOutlined />}
               sx={{
                 borderRadius: 999,

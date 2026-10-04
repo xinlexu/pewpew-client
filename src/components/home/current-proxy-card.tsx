@@ -13,6 +13,7 @@ import {
   SelectChangeEvent,
   Stack,
   Typography,
+  Tooltip,
   alpha,
   useTheme,
 } from '@mui/material'
@@ -24,6 +25,7 @@ import { useProfiles } from '@/hooks/use-profiles'
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import {
   useAppRefreshers,
+  useClashConfigData,
   useCoreDataStatus,
   useProxiesData,
 } from '@/providers/app-data-context'
@@ -85,21 +87,21 @@ export const CurrentProxyCard = ({
   const theme = useTheme()
   const { t } = useTranslation()
   const { proxies } = useProxiesData()
+  const { clashConfig } = useClashConfigData()
   const { refreshProxy } = useAppRefreshers()
   const { isCoreDataPending } = useCoreDataStatus()
   const { current: currentProfile } = useProfiles()
   const lastDelayCheckAtRef = useRef<Record<string, number>>({})
   const [, forceDelayRender] = useReducer((value: number) => value + 1, 0)
 
-  const { group, options } = useMemo(
-    () => resolvePewPewProxyGroup(proxies),
-    [proxies],
+  const { group, options, currentName } = useMemo(
+    () => resolvePewPewProxyGroup(proxies, clashConfig?.mode),
+    [proxies, clashConfig?.mode],
   )
 
   const currentLine = useMemo(() => {
-    if (!group?.now) return null
-    return options.find((item) => item.name === group.now) || null
-  }, [group?.now, options])
+    return options.find((item) => item.name === currentName) || null
+  }, [currentName, options])
 
   const selectedValue = currentLine?.name || ''
   const groupName = group?.name || ''
@@ -119,7 +121,9 @@ export const CurrentProxyCard = ({
     const nextLine = event.target.value
     if (!groupName || !nextLine || nextLine === selectedValue) return
 
-    changeProxy(groupName, nextLine, selectedValue)
+    const option = options.find((item) => item.name === nextLine)
+    if (!option?.selectionPath?.length) return
+    changeProxy(groupName, nextLine, selectedValue, false, option.selectionPath)
   }
 
   const checkVisibleLineDelay = useCallback(
@@ -278,19 +282,21 @@ export const CurrentProxyCard = ({
               })}
             </Select>
           </FormControl>
-          <IconButton
-            size="small"
-            onClick={() => void checkVisibleLineDelay(true)}
-            aria-label={t('home.pewpew.delay.refresh')}
-            sx={(theme) => ({
-              width: 34,
-              height: 34,
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-              bgcolor: alpha(theme.palette.primary.main, 0.04),
-            })}
-          >
-            <RefreshRounded sx={{ fontSize: 18 }} />
-          </IconButton>
+          <Tooltip title={t('home.pewpew.delay.refresh')}>
+            <IconButton
+              size="small"
+              onClick={() => void checkVisibleLineDelay(true)}
+              aria-label={t('home.pewpew.delay.refresh')}
+              sx={(theme) => ({
+                width: 34,
+                height: 34,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+                bgcolor: alpha(theme.palette.primary.main, 0.04),
+              })}
+            >
+              <RefreshRounded sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
         </Stack>
       )}
     </Stack>

@@ -1,4 +1,10 @@
-import dayjs, { Dayjs } from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
+
+export type PewPewRouteSelection = {
+  groupName: string
+  proxyName: string
+  previousProxy?: string
+}
 
 type ProfileExtra = {
   upload?: number
@@ -39,12 +45,14 @@ export type PewPewAccountEvaluation = {
 export type PewPewProxyOption = {
   name: string
   record: IProxyItem
+  selectionPath?: PewPewRouteSelection[]
 }
 
 export type PewPewProxyGroupResult = {
   group: IProxyGroupItem | null
   options: PewPewProxyOption[]
   filteredInfoCount: number
+  currentName: string
 }
 
 export const PEWPEW_UNKNOWN_STATUS = '未提供'
@@ -272,33 +280,49 @@ const groupOptions = (
   groupMap: Map<string, IProxyGroupItem> = new Map(),
 ): PewPewProxyOption[] => {
   if (!group?.all?.length) return []
-  const expandNames = (
-    items: Array<string | IProxyItem>,
-    depth = 0,
-    seenGroups = new Set<string>(),
-  ): string[] => {
-    return items.flatMap((item) => {
+  const options: PewPewProxyOption[] = []
+  const seenRoutes = new Set<string>()
+  const visit = (
+    parent: IProxyGroupItem | IProxyItem,
+    path: PewPewRouteSelection[],
+    seenGroups: Set<string>,
+  ) => {
+    if (normalizeType(parent.type) !== 'selector') return
+    for (const item of parent.all || []) {
       const name = getProxyName(item)
-      if (!name) return []
-
-      const record = records[name]
+      if (!name) continue
+      const record =
+        records[name] || (typeof item === 'object' ? item : undefined)
       const nestedGroup =
         groupMap.get(name) ||
         (Array.isArray(record?.all) && record.all.length > 0
           ? (record as unknown as IProxyGroupItem)
           : null)
 
-      if (nestedGroup?.all?.length && depth < 2 && !seenGroups.has(name)) {
+      const selectionPath = [
+        ...path,
+        { groupName: parent.name, proxyName: name, previousProxy: parent.now },
+      ]
+      if (nestedGroup && !seenGroups.has(name)) {
         const nextSeen = new Set(seenGroups)
         nextSeen.add(name)
-        return expandNames(nestedGroup.all, depth + 1, nextSeen)
+        visit(nestedGroup, selectionPath, nextSeen)
+      } else if (
+        !nestedGroup &&
+        !seenRoutes.has(name) &&
+        isRealRoute(name, record)
+      ) {
+        seenRoutes.add(name)
+        options.push({
+          name,
+          record: record || ({ name } as IProxyItem),
+          selectionPath,
+        })
       }
-
-      return [name]
-    })
+    }
   }
-
-  return filterDisplayRoutes(expandNames(group.all), records)
+  visit(group, [], new Set([group.name]))
+  return options
 }
 
 const collectGroups = (proxies: any): IProxyGroupItem[] => {
@@ -365,6 +389,7 @@ const collectProxyNames = (proxies: any) => {
 
 export const resolvePewPewProxyGroup = (
   proxies: any,
+  mode = 'rule',
 ): PewPewProxyGroupResult => {
   const records = (proxies?.records || {}) as Record<string, IProxyItem>
   const allNames = collectProxyNames(proxies)
@@ -372,7 +397,14 @@ export const resolvePewPewProxyGroup = (
   const groupMap = new Map(
     collectGroups(proxies).map((group) => [group.name, group] as const),
   )
-  const groups = collectGroups(proxies)
+  const selectableGroups = collectGroups(proxies).filter(
+    (group) => normalizeType(group.type) === 'selector',
+  )
+  const candidates =
+    mode.toLowerCase() === 'global'
+      ? selectableGroups.filter((group) => group.name === 'GLOBAL')
+      : selectableGroups.filter((group) => group.name !== 'GLOBAL')
+  const groups = candidates
     .map((group, index) => ({
       group,
       options: groupOptions(group, records, groupMap),
@@ -387,9 +419,24 @@ export const resolvePewPewProxyGroup = (
     .sort((a, b) => b.score - a.score)
 
   const best = groups[0]
+  let currentName = best?.group.now || ''
+  const visited = new Set<string>()
+  while (
+    currentName &&
+    groupMap.has(currentName) &&
+    !visited.has(currentName)
+  ) {
+    visited.add(currentName)
+    currentName = groupMap.get(currentName)?.now || ''
+  }
   return best
-    ? { group: best.group, options: best.options, filteredInfoCount }
-    : { group: null, options: [], filteredInfoCount }
+    ? {
+        group: best.group,
+        options: best.options,
+        filteredInfoCount,
+        currentName,
+      }
+    : { group: null, options: [], filteredInfoCount, currentName: '' }
 }
 
 const formatBytes = (value?: number) => {

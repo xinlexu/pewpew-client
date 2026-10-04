@@ -548,6 +548,17 @@ pub async fn profiles_append_item_safe(item: &mut PrfItem) -> Result<()> {
         .await
 }
 
+pub async fn profiles_append_item_and_save_safe(item: &mut PrfItem) -> Result<()> {
+    Config::profiles()
+        .await
+        .with_data_modify(|mut profiles| async move {
+            profiles.append_item(item).await?;
+            profiles.save_file().await?;
+            Ok((profiles, ()))
+        })
+        .await
+}
+
 pub async fn profiles_patch_item_safe(index: &String, item: &PrfItem) -> Result<()> {
     Config::profiles()
         .await

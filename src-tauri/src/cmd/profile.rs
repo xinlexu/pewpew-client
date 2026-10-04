@@ -6,10 +6,9 @@ use crate::{
     config::{
         Config, IProfiles, PrfItem, PrfOption,
         profiles::{
-            profiles_append_item_with_filedata_safe, profiles_delete_item_safe, profiles_patch_item_safe,
-            profiles_reorder_safe, profiles_save_file_safe,
+            profiles_append_item_and_save_safe, profiles_append_item_with_filedata_safe, profiles_delete_item_safe,
+            profiles_patch_item_safe, profiles_reorder_safe, profiles_save_file_safe,
         },
-        profiles_append_item_safe,
     },
     core::{CoreManager, handle, timer::Timer, tray::Tray, validate::ValidationOutcome},
     feat,
@@ -74,15 +73,8 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
         }
     };
 
-    match profiles_append_item_safe(item).await {
-        Ok(_) => match profiles_save_file_safe().await {
-            Ok(_) => {
-                logging!(info, Type::Cmd, "[导入订阅] 配置文件保存成功");
-            }
-            Err(e) => {
-                logging!(error, Type::Cmd, "[导入订阅] 保存配置文件失败: {}", e);
-            }
-        },
+    match profiles_append_item_and_save_safe(item).await {
+        Ok(_) => logging!(info, Type::Cmd, "[导入订阅] 配置文件保存成功"),
         Err(e) => {
             logging!(error, Type::Cmd, "[导入订阅] 保存配置失败: {}", e);
             return Err(format!("导入订阅失败: {}", e).into());

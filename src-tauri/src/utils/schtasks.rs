@@ -97,8 +97,8 @@ fn get_startup_dir() -> Result<PathBuf> {
 
 async fn cleanup_legacy_shortcuts() -> Result<()> {
     let startup_dir = get_startup_dir()?;
-    let old_shortcut = startup_dir.join("Clash-Verge.lnk");
-    let new_shortcut = startup_dir.join("Clash Verge.lnk");
+    let old_shortcut = startup_dir.join("PewPew Cloud Client.lnk");
+    let new_shortcut = startup_dir.join("PewPew 云客户端.lnk");
 
     old_shortcut.remove_if_exists().await?;
     new_shortcut.remove_if_exists().await?;

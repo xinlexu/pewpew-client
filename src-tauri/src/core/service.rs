@@ -292,13 +292,8 @@ fn uninstall_service() -> Result<()> {
         bail!(format!("uninstaller not found: {uninstall_path:?}"));
     }
 
-    let uninstall_shell: String = uninstall_path.to_string_lossy().into_owned();
-
-    // clash_verge_i18n::sync_locale(Config::verge().await.latest_arc().language.as_deref());
-
     let prompt = clash_verge_i18n::t!("service.adminUninstallPrompt");
-    let command =
-        format!(r#"do shell script "sudo '{uninstall_shell}'" with administrator privileges with prompt "{prompt}""#);
+    let command = macos_service_admin_script(&uninstall_path.to_string_lossy(), None, &prompt);
 
     // logging!(debug, Type::Service, "uninstall command: {}", command);
 
@@ -325,15 +320,9 @@ fn install_service() -> Result<()> {
         bail!(format!("installer not found: {install_path:?}"));
     }
 
-    let install_shell: String = install_path.to_string_lossy().into_owned();
-
-    // clash_verge_i18n::sync_locale(Config::verge().await.latest_arc().language.as_deref());
-
     let gid = tauri_plugin_clash_verge_sysinfo::current_gid();
     let prompt = clash_verge_i18n::t!("service.adminInstallPrompt");
-    let command = format!(
-        r#"do shell script "sudo CLASH_VERGE_SERVICE_GID={gid} '{install_shell}'" with administrator privileges with prompt "{prompt}""#
-    );
+    let command = macos_service_admin_script(&install_path.to_string_lossy(), Some(gid), &prompt);
 
     let output = StdCommand::new("osascript").args(vec!["-e", &command]).output()?;
     if let Some((code, err)) = check_output_error(&output) {
@@ -348,6 +337,21 @@ fn install_service() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(any(target_os = "macos", test))]
+fn macos_service_admin_script(path: &str, gid: Option<u32>, prompt: &str) -> String {
+    let quoted_path = format!("'{}'", path.replace('\'', r"'\''"));
+    let shell = match gid {
+        Some(gid) => format!("cd /; env CLASH_VERGE_SERVICE_GID={gid} {quoted_path}"),
+        None => format!("cd /; {quoted_path}"),
+    };
+    let escape = |value: &str| value.replace('\\', "\\\\").replace('"', "\\\"");
+    format!(
+        r#"do shell script "{}" with administrator privileges with prompt "{}""#,
+        escape(&shell),
+        escape(prompt)
+    )
 }
 
 fn check_output_error(output: &std::process::Output) -> Option<(i32, Cow<'_, str>)> {
@@ -615,3 +619,30 @@ impl ServiceManager {
 }
 
 pub static SERVICE_MANAGER: Lazy<Mutex<ServiceManager>> = Lazy::new(|| Mutex::new(ServiceManager::default()));
+
+#[cfg(test)]
+mod tests {
+    use super::macos_service_admin_script;
+
+    #[test]
+    fn macos_service_paths_and_prompts_are_quoted() {
+        let result = macos_service_admin_script(
+            "/Applications/PewPew's \"Cloud\"/helper",
+            Some(501),
+            "PewPew \"Service\"",
+        );
+        assert_eq!(
+            result,
+            r#"do shell script "cd /; env CLASH_VERGE_SERVICE_GID=501 '/Applications/PewPew'\\''s \"Cloud\"/helper'" with administrator privileges with prompt "PewPew \"Service\"""#
+        );
+    }
+
+    #[test]
+    fn macos_uninstall_does_not_require_nested_sudo() {
+        let result = macos_service_admin_script("/Applications/PewPew Cloud/helper", None, "PewPew Background Service");
+        assert_eq!(
+            result,
+            r#"do shell script "cd /; '/Applications/PewPew Cloud/helper'" with administrator privileges with prompt "PewPew Background Service""#
+        );
+    }
+}

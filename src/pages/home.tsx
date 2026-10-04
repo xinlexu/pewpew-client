@@ -153,17 +153,17 @@ const HomePage = () => {
   )
   const isDark = theme.palette.mode === 'dark'
   const proxyGroupResult = useMemo(
-    () => resolvePewPewProxyGroup(proxies),
-    [proxies],
+    () => resolvePewPewProxyGroup(proxies, clashConfig?.mode),
+    [proxies, clashConfig?.mode],
   )
 
   const currentLineSummary = (() => {
     if (lineSyncing) return { name: '', delayText: '' }
 
-    const { group, options } = proxyGroupResult
-    if (!group?.now) return { name: '', delayText: '' }
+    const { group, options, currentName } = proxyGroupResult
+    if (!group || !currentName) return { name: '', delayText: '' }
 
-    const currentLine = options.find((item) => item.name === group.now)
+    const currentLine = options.find((item) => item.name === currentName)
     if (!currentLine) return { name: '', delayText: '' }
 
     const cachedDelay = delayManager.getDelayUpdate(
@@ -297,7 +297,12 @@ const HomePage = () => {
 
   useEffect(() => {
     if (startupUpdateRanRef.current) return
-    if (!autoUpdateRoutesOnStartup || !current?.uid) return
+    if (
+      !autoUpdateRoutesOnStartup ||
+      !current?.uid ||
+      current.type !== 'remote'
+    )
+      return
     if (connectionEnabled || lineSyncing) {
       startupUpdateRanRef.current = true
       return
@@ -325,6 +330,7 @@ const HomePage = () => {
     connectionEnabled,
     current?.option,
     current?.uid,
+    current?.type,
     lineSyncing,
     mutateProfiles,
     refreshAll,
@@ -436,6 +442,7 @@ const HomePage = () => {
         <Box ref={subscriptionCardRef}>
           <HomeProfileCard
             current={current}
+            busy={lineSyncing}
             onProfileUpdated={mutateProfiles}
             onSyncingChange={setLineSyncing}
           />

@@ -9,6 +9,8 @@ import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
 import { syncTrayProxySelection } from '@/services/cmds'
 import { debugLog } from '@/utils/debug'
+import type { PewPewRouteSelection } from '@/utils/pewpew-client'
+import { applyRouteSelection } from '@/utils/route-selection'
 
 // 缓存连接清理
 const cleanupConnections = async (previousProxy: string) => {
@@ -38,6 +40,7 @@ interface ProxyChangeRequest {
   proxyName: string
   previousProxy?: string
   skipConfigSave: boolean
+  path?: PewPewRouteSelection[]
 }
 
 // 代理选择 Hook
@@ -66,16 +69,17 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
   }, [])
 
   const persistSelection = useCallback(
-    (groupName: string, proxyName: string, skipConfigSave: boolean) => {
+    (path: PewPewRouteSelection[], skipConfigSave: boolean) => {
       if (!current || skipConfigSave) return
 
       const selected = current.selected ? [...current.selected] : []
-      const index = selected.findIndex((item) => item.name === groupName)
-
-      if (index < 0) {
-        selected.push({ name: groupName, now: proxyName })
-      } else {
-        selected[index] = { name: groupName, now: proxyName }
+      for (const { groupName, proxyName } of path) {
+        const index = selected.findIndex((item) => item.name === groupName)
+        if (index < 0) {
+          selected.push({ name: groupName, now: proxyName })
+        } else {
+          selected[index] = { name: groupName, now: proxyName }
+        }
       }
 
       patchCurrent({ selected }).catch((error) => {
@@ -88,13 +92,14 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
   const executeChange = useCallback(
     async (request: ProxyChangeRequest) => {
       const { groupName, proxyName, previousProxy, skipConfigSave } = request
+      const path = request.path || [{ groupName, proxyName, previousProxy }]
       debugLog(`[ProxySelection] 代理切换: ${groupName} -> ${proxyName}`)
 
       try {
-        await selectNodeForGroup(groupName, proxyName)
+        await applyRouteSelection(path, selectNodeForGroup)
         onSuccess?.()
         syncTraySelection()
-        persistSelection(groupName, proxyName, skipConfigSave)
+        persistSelection(path, skipConfigSave)
         debugLog(
           `[ProxySelection] 代理和状态同步完成: ${groupName} -> ${proxyName}`,
         )
@@ -113,10 +118,10 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
         )
 
         try {
-          await selectNodeForGroup(groupName, proxyName)
+          await applyRouteSelection(path, selectNodeForGroup)
           onSuccess?.()
           syncTraySelection()
-          persistSelection(groupName, proxyName, skipConfigSave)
+          persistSelection(path, skipConfigSave)
           debugLog(
             `[ProxySelection] 代理切换回退成功: ${groupName} -> ${proxyName}`,
           )
@@ -156,12 +161,14 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
       proxyName: string,
       previousProxy?: string,
       skipConfigSave: boolean = false,
+      path?: PewPewRouteSelection[],
     ) => {
       pendingRequestRef.current = {
         groupName,
         proxyName,
         previousProxy,
         skipConfigSave,
+        path,
       }
       void flushChangeQueue()
     },

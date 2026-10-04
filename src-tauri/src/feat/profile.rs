@@ -183,7 +183,7 @@ async fn perform_profile_update(
     if is_mannual_trigger {
         handle::Handle::notice_message("update_failed_even_with_clash", format!("{profile_name} - {last_err}"));
     }
-    Ok(is_current)
+    Err(last_err)
 }
 
 pub async fn update_profile(
@@ -216,12 +216,14 @@ pub async fn update_profile(
             Ok(outcome) => {
                 let message = outcome.to_string();
                 logging!(error, Type::Config, "[订阅更新] 更新失败: {}", message);
-                handle::Handle::notice_message("update_failed", message);
+                handle::Handle::notice_message("update_failed", message.clone());
+                bail!(message);
             }
             Err(err) => {
                 logging!(error, Type::Config, "[订阅更新] 更新失败: {}", err);
                 handle::Handle::notice_message("update_failed", format!("{err}"));
                 logging!(error, Type::Config, "{err}");
+                return Err(err);
             }
         }
     }
