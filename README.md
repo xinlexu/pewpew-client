@@ -6,14 +6,17 @@ PewPew 云客户端是面向 PewPew 云用户的简化版桌面客户端，用�
 
 ## 下载
 
-**Windows x64 内测修复版（0.1.3，2026-10-07）：[下载安装包（.exe）](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.3-windows-test.20261007/PewPewCloud_0.1.3_windows-x64_test-20261007_setup.exe)**
+**Windows x64 安装流程加固内测版（0.1.4，2026-10-07）：[下载安装包（.exe）](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.4-windows-test.20261007/PewPewCloud_0.1.4_windows-x64_test-20261007_setup.exe)**
 
-[查看版本说明](https://github.com/xinlexu/pewpew-client/releases/tag/v0.1.3-windows-test.20261007) · [SHA-256 校验文件](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.3-windows-test.20261007/SHA256SUMS.txt)
+[查看版本说明与已知问题](https://github.com/xinlexu/pewpew-client/releases/tag/v0.1.4-windows-test.20261007) · [SHA-256 校验文件](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.4-windows-test.20261007/SHA256SUMS.txt)
+
+> **风险提示：0.1.3 安装期间曾报告整机无响应，根因尚未确认；0.1.4 也有客户端无法从后台退出的反馈。本包不能宣称已经修复卡死。请优先在有快照的 Windows 虚拟机测试，不建议在重要工作电脑直接覆盖安装或广泛分发。**
 
 - 本包未签名，仅供内部测试。Windows 可能提示未知发布者，请确认下载来源并核对校验值。
 - 本包已包含新版界面、标准 / 增强兼容模式，以及导入、线路选择和连接状态相关修复。
-- 修复 Windows 增强兼容模式安装后台服务时的路径引号问题，并区分取消授权与安装失败。自动化检查已通过，首次系统授权和实际增强兼容连接仍需在目标电脑验证；若仍失败，请复制诊断信息联系客服。
-- 修复覆盖旧版时内核文件被占用导致的写入失败。若旧安装器正在报错，请先点击“中止”，不要选择“忽略”，再使用本包重试；无需删除订阅配置。
+- 安装器不再强制结束客户端；请先断开连接并从托盘退出。残留核心仅在核对所属安装路径后尝试结束，等待或写入失败则中止安装。
+- 修正后台服务辅助程序的 Windows 路径处理，检查文件写入磁盘结果，并新增分阶段安装日志：`%APPDATA%\com.pewpewcloud.client\logs\installer.log`。未更换 mihomo 内核；文件刷新不能保证强制断电后文件完整。
+- Windows 隔离回归测试和构建检查已通过；真实管理员升级、活动 TUN、火绒/ACE 环境及退出卡住问题仍待验证。安装错误请取消，不要选择“忽略”；无需删除订阅配置。
 - macOS（Apple 芯片 / Intel）暂未发布 PewPew 测试包。
 
 ## 主要功能
