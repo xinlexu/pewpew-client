@@ -6,12 +6,13 @@ PewPew 云客户端是面向 PewPew 云用户的简化版桌面客户端，用�
 
 ## 下载
 
-**Windows x64 内测版（0.1.1，2026-10-07）：[下载安装包（.exe）](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.1-windows-test.20261007/PewPewCloud_0.1.1_windows-x64_test-20261007_setup.exe)**
+**Windows x64 内测修复版（0.1.2，2026-10-07）：[下载安装包（.exe）](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.2-windows-test.20261007/PewPewCloud_0.1.2_windows-x64_test-20261007_setup.exe)**
 
-[查看版本说明](https://github.com/xinlexu/pewpew-client/releases/tag/v0.1.1-windows-test.20261007) · [SHA-256 校验文件](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.1-windows-test.20261007/SHA256SUMS.txt)
+[查看版本说明](https://github.com/xinlexu/pewpew-client/releases/tag/v0.1.2-windows-test.20261007) · [SHA-256 校验文件](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.2-windows-test.20261007/SHA256SUMS.txt)
 
 - 本包未签名，仅供内部测试。Windows 可能提示未知发布者，请确认下载来源并核对校验值。
 - 本包已包含新版界面、标准 / 增强兼容模式，以及导入、线路选择和连接状态相关修复。
+- 修复覆盖旧版时内核文件被占用导致的写入失败。若旧安装器正在报错，请先点击“中止”，不要选择“忽略”，再使用本包重试；无需删除订阅配置。
 - macOS（Apple 芯片 / Intel）暂未发布 PewPew 测试包。
 
 ## 主要功能
