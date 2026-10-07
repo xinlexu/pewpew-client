@@ -1,6 +1,6 @@
 [package]
 name = "pewpew-client"
-version = "0.1.0"
+version = "0.1.1"
 description = "PewPew 云客户端"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
