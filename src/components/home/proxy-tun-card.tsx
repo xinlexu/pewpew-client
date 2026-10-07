@@ -99,6 +99,13 @@ const getErrorNoticeKey = (
 ) => {
   if (message.includes('pewpew-service-conflict'))
     return 'home.pewpew.compatibility.serviceConflict'
+  if (message.includes('pewpew-service-install-cancelled'))
+    return 'home.pewpew.compatibility.permissionDenied'
+  if (
+    message.includes('pewpew-service-install-failed') ||
+    message.includes('failed to install service')
+  )
+    return 'home.pewpew.compatibility.serviceInstallFailed'
   if (message.includes('rollback-failed'))
     return 'home.pewpew.compatibility.rollbackFailed'
   if (message.includes('pewpew-core-unavailable'))

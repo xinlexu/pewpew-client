@@ -191,6 +191,8 @@
       "standardHint": "Works for browsers and most apps",
       "enhancedHint": "For games, Discord voice and apps that ignore the system proxy. Needs permission the first time.",
       "serviceUnavailable": "The background service isn't ready. Enhanced mode needs system permission. Please try again.",
+      "permissionDenied": "Enhanced mode needs your permission. Try again and choose Yes in the Windows prompt.",
+      "serviceInstallFailed": "The background service couldn't be installed. Restart the client and try again. If this continues, copy diagnostics for support.",
       "switchToEnhanced": "Switch to Enhanced",
       "summaryCoreDown": "The connection core isn't running. Use Repair Network or restart the client.",
       "summaryEnhancedActive": "Enhanced routing is enabled. Test your game or voice connection to confirm.",

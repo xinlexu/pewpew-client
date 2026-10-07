@@ -191,6 +191,8 @@
       "standardHint": "适合浏览器和大多数应用",
       "enhancedHint": "适合游戏、Discord 语音等不走系统代理的应用，首次使用需要授权",
       "serviceUnavailable": "后台服务还没准备好。增强兼容需要系统授权，请重试",
+      "permissionDenied": "需要系统授权才能使用增强兼容。请重试，并在 Windows 弹出的窗口中点“是”。",
+      "serviceInstallFailed": "后台服务安装失败，请重启客户端后重试；仍不行请复制诊断信息发给客服。",
       "switchToEnhanced": "切换到增强兼容",
       "summaryCoreDown": "连接核心没有运行，请点击“恢复网络”或重启客户端",
       "summaryEnhancedActive": "增强兼容已启用，游戏和语音连通性仍需实际测试。",

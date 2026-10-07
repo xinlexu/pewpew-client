@@ -52,6 +52,19 @@ pub async fn disconnect_connection() -> Result<()> {
     Ok(())
 }
 
+/// Notice shown when the tray or a hotkey cannot switch the connection.
+fn connection_error_notice(error: &str) -> &'static str {
+    if error.contains("pewpew-service-conflict") {
+        "home.pewpew.compatibility.serviceConflict"
+    } else if error.contains("pewpew-service-install-cancelled") {
+        "home.pewpew.compatibility.permissionDenied"
+    } else if error.contains("pewpew-service-install-failed") {
+        "home.pewpew.compatibility.serviceInstallFailed"
+    } else {
+        "home.pewpew.compatibility.changeFailed"
+    }
+}
+
 /// Tray and hotkey actions follow the same remembered connection mode as home.
 pub async fn toggle_system_proxy() -> bool {
     let verge = Config::verge().await.latest_arc();
@@ -83,12 +96,7 @@ pub async fn toggle_system_proxy() -> bool {
         }
         Err(err) => {
             logging!(error, Type::ProxyMode, "{err}");
-            let message = if err.to_string().contains("pewpew-service-conflict") {
-                "home.pewpew.compatibility.serviceConflict"
-            } else {
-                "home.pewpew.compatibility.changeFailed"
-            };
-            handle::Handle::notice_message("set_config::error", message);
+            handle::Handle::notice_message("set_config::error", connection_error_notice(&err.to_string()));
             current
         }
     }
@@ -170,8 +178,28 @@ pub async fn copy_clash_env() {
 
 #[cfg(test)]
 mod tests {
-    use super::connection_patch;
+    use super::{connection_error_notice, connection_patch};
     use crate::config::IVerge;
+
+    #[test]
+    fn service_install_errors_get_their_own_notice() {
+        assert_eq!(
+            connection_error_notice("pewpew-service-install-cancelled"),
+            "home.pewpew.compatibility.permissionDenied"
+        );
+        assert_eq!(
+            connection_error_notice("failed to install service: pewpew-service-install-failed (code 1)"),
+            "home.pewpew.compatibility.serviceInstallFailed"
+        );
+        assert_eq!(
+            connection_error_notice("pewpew-service-conflict"),
+            "home.pewpew.compatibility.serviceConflict"
+        );
+        assert_eq!(
+            connection_error_notice("core restart failed"),
+            "home.pewpew.compatibility.changeFailed"
+        );
+    }
 
     #[test]
     fn tray_connect_uses_remembered_mode_without_changing_preference() {

@@ -207,6 +207,8 @@ mockIPC(
       case 'is_service_available':
         return true
       case 'prepare_enhanced_connection':
+        if (params.get('prepareError'))
+          throw new Error(params.get('prepareError')!)
         return null
       case 'patch_clash_mode':
         if (params.has('failMode')) throw new Error('mode rejected')

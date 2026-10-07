@@ -325,6 +325,30 @@ await check(
   },
 )
 
+for (const [error, notice] of [
+  [
+    'pewpew-service-install-failed (code 1): Access is denied.',
+    '后台服务安装失败',
+  ],
+  ['pewpew-service-install-cancelled', '需要系统授权才能使用增强兼容'],
+]) {
+  await check(
+    `enhanced connect explains a service install problem: ${notice}`,
+    async ({ page, open, toasts }) => {
+      await open(
+        `enhancedMode&accepted&prepareError=${encodeURIComponent(error)}`,
+      )
+      await page.getByRole('button', { name: '连接', exact: true }).click()
+      await page.getByText('连接失败', { exact: true }).waitFor()
+      const list = await toasts()
+      assert.ok(
+        list.some((t) => t.includes(notice)),
+        list.join(' | '),
+      )
+    },
+  )
+}
+
 await check(
   'an external reconnect clears the failure state',
   async ({ page, open }) => {

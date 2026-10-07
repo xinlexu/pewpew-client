@@ -217,10 +217,12 @@ export interface TranslationResources {
           mode: string
           notTested: string
           permissionBody: string
+          permissionDenied: string
           permissionTitle: string
           rollbackFailed: string
           service: string
           serviceConflict: string
+          serviceInstallFailed: string
           serviceUnavailable: string
           standard: string
           standardHint: string

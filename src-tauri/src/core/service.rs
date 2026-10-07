@@ -32,11 +32,11 @@ pub enum ServiceStatus {
 #[derive(Clone)]
 pub struct ServiceManager(ServiceStatus);
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", test))]
 const WINDOWS_SERVICE_NAME: &str = "clash_verge_service";
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", test))]
 const WINDOWS_SERVICE_DISPLAY_NAME: &str = "PewPew Background Service";
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", test))]
 const WINDOWS_SERVICE_DESCRIPTION: &str = "PewPew Background Service helps to launch the connection core";
 
 #[cfg(target_os = "windows")]
@@ -99,7 +99,8 @@ pub async fn prepare_enhanced_connection() -> Result<()> {
 fn apply_service_branding_privileged() -> Result<()> {
     use std::os::windows::process::CommandExt as _;
 
-    let status = StdCommand::new("sc.exe")
+    let sc = windows_system_dir()?.join("sc.exe");
+    let status = StdCommand::new(&sc)
         .args([
             "config",
             WINDOWS_SERVICE_NAME,
@@ -115,7 +116,7 @@ fn apply_service_branding_privileged() -> Result<()> {
         );
     }
 
-    let status = StdCommand::new("sc.exe")
+    let status = StdCommand::new(&sc)
         .args(["description", WINDOWS_SERVICE_NAME, WINDOWS_SERVICE_DESCRIPTION])
         .creation_flags(0x08000000)
         .status()?;
@@ -163,48 +164,27 @@ fn uninstall_service() -> Result<()> {
 
 #[cfg(target_os = "windows")]
 fn install_service() -> Result<()> {
-    use std::process::Output;
     logging!(info, Type::Service, "install service");
 
     use deelevate::{PrivilegeLevel, Token};
-    use runas::Command as RunasCommand;
     use std::os::windows::process::CommandExt as _;
 
     let binary_path = dirs::service_path()?;
     let install_path = binary_path.with_file_name("clash-verge-service-install.exe");
 
     if !install_path.exists() {
-        bail!(format!("installer not found: {install_path:?}"));
+        bail!("pewpew-service-install-failed: installer not found: {install_path:?}");
     }
 
     let token = Token::with_current_process()?;
-    let level = token.privilege_level()?;
-    let output = match level {
-        PrivilegeLevel::NotPrivileged => {
-            let command = format!(
-                r#""{}" && sc.exe config {} DisplayName= "{}" && sc.exe description {} "{}""#,
-                install_path.display(),
-                WINDOWS_SERVICE_NAME,
-                WINDOWS_SERVICE_DISPLAY_NAME,
-                WINDOWS_SERVICE_NAME,
-                WINDOWS_SERVICE_DESCRIPTION
-            );
-            let status = RunasCommand::new("cmd").arg("/C").arg(command).show(false).status()?;
-            Output {
-                status,
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-            }
-        }
-        _ => {
-            let output = StdCommand::new(&install_path).creation_flags(0x08000000).output()?;
-            if output.status.success() {
-                apply_service_branding_privileged()?;
-            }
-            output
-        }
-    };
+    if matches!(token.privilege_level()?, PrivilegeLevel::NotPrivileged) {
+        return install_service_elevated(&install_path);
+    }
 
+    let output = StdCommand::new(&install_path)
+        .creation_flags(0x08000000)
+        .output()
+        .map_err(|error| anyhow!("pewpew-service-install-failed: cannot start installer: {error}"))?;
     if let Some((code, err)) = check_output_error(&output) {
         logging!(
             error,
@@ -213,10 +193,181 @@ fn install_service() -> Result<()> {
             code,
             err
         );
-        bail!("failed to install service code: {}, details: {}", code, err);
+        bail!("pewpew-service-install-failed (code {code}): {err}");
     }
+    apply_service_branding_privileged().context("pewpew-service-install-failed: cannot set service name")?;
 
     Ok(())
+}
+
+/// Installs the service behind a single UAC prompt and gives it the PewPew name.
+///
+/// The `runas` crate escapes quotes as `\"`, which `cmd.exe` does not understand,
+/// so the elevated shell could never find the installer. The command line is
+/// therefore handed to `ShellExecuteExW` exactly as `cmd.exe` expects it.
+#[cfg(target_os = "windows")]
+fn install_service_elevated(install_path: &Path) -> Result<()> {
+    use windows::core::HSTRING;
+
+    let system_dir = windows_system_dir()?;
+    let log_path = dirs::app_logs_dir()?.join("service-install.log");
+    if let Some(parent) = log_path.parent() {
+        std::fs::create_dir_all(parent).context("pewpew-service-install-failed: cannot prepare log directory")?;
+    }
+    std::fs::File::create(&log_path).context("pewpew-service-install-failed: cannot write install log")?;
+
+    let code = match elevated_install_parameters(install_path, &system_dir.join("sc.exe"), &log_path) {
+        Some(parameters) => run_elevated(
+            &HSTRING::from(system_dir.join("cmd.exe").as_os_str()),
+            &HSTRING::from(parameters.as_str()),
+        )?,
+        // A path cmd.exe cannot quote safely: install without renaming; the
+        // next client update gives the service its PewPew name.
+        None => run_elevated(&HSTRING::from(install_path.as_os_str()), &HSTRING::new())?,
+    };
+    if code == 0 {
+        return Ok(());
+    }
+
+    let details = std::fs::read(&log_path)
+        .map(|bytes| decode_console_output(&bytes))
+        .unwrap_or_default();
+    let details: String = details.trim().chars().take(600).collect();
+    logging!(
+        error,
+        Type::Service,
+        "failed to install service code: {}, details: {}",
+        code,
+        details
+    );
+    if details.is_empty() {
+        bail!("pewpew-service-install-failed (code {code})");
+    }
+    bail!("pewpew-service-install-failed (code {code}): {details}");
+}
+
+/// Builds the `cmd.exe` arguments for [`install_service_elevated`].
+///
+/// `/S /C "..."` makes cmd strip only the outer quotes, so every path keeps its
+/// own quotes. `/D` skips AutoRun commands and `/V:OFF` keeps `!` literal in
+/// the elevated shell. All steps write their output to `log` for diagnostics.
+/// Returns `None` for paths that cmd.exe would rewrite (`%` is expanded even
+/// inside quotes) or that cannot be quoted at all.
+#[cfg(any(target_os = "windows", test))]
+fn elevated_install_parameters(install: &Path, sc: &Path, log: &Path) -> Option<String> {
+    let quoted = |path: &Path| {
+        let text = path.to_str()?;
+        if text.is_empty() || text.contains(['%', '"', '\r', '\n']) {
+            return None;
+        }
+        Some(format!("\"{text}\""))
+    };
+    let (install, sc, log) = (quoted(install)?, quoted(sc)?, quoted(log)?);
+    Some(format!(
+        r#"/D /V:OFF /S /C "({install} && {sc} config {WINDOWS_SERVICE_NAME} DisplayName= "{WINDOWS_SERVICE_DISPLAY_NAME}" && {sc} description {WINDOWS_SERVICE_NAME} "{WINDOWS_SERVICE_DESCRIPTION}") > {log} 2>&1""#
+    ))
+}
+
+#[cfg(target_os = "windows")]
+fn windows_system_dir() -> Result<PathBuf> {
+    use windows::Win32::System::SystemInformation::GetSystemDirectoryW;
+
+    let mut buffer = [0u16; 260];
+    // SAFETY: the buffer outlives the call and its length is passed with it.
+    let len = unsafe { GetSystemDirectoryW(Some(&mut buffer)) } as usize;
+    if len == 0 || len >= buffer.len() {
+        bail!("failed to locate the Windows system directory");
+    }
+    Ok(PathBuf::from(String::from_utf16(&buffer[..len])?))
+}
+
+/// Runs `file` with administrator rights (one UAC prompt, hidden window) and
+/// waits for it, returning its exit code.
+#[cfg(target_os = "windows")]
+fn run_elevated(file: &windows::core::HSTRING, parameters: &windows::core::HSTRING) -> Result<u32> {
+    use windows::{
+        Win32::{
+            Foundation::{CloseHandle, ERROR_CANCELLED, WAIT_FAILED},
+            System::{
+                Com::{COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize},
+                Threading::{GetExitCodeProcess, INFINITE, WaitForSingleObject},
+            },
+            UI::{
+                Shell::{SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW, ShellExecuteExW},
+                WindowsAndMessaging::SW_HIDE,
+            },
+        },
+        core::{PCWSTR, w},
+    };
+
+    // A dedicated thread keeps COM initialisation away from runtime workers.
+    std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                // SAFETY: every pointer handed to the shell outlives the calls,
+                // and the process handle is closed exactly once.
+                unsafe {
+                    let com = CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+                    com.ok()
+                        .context("pewpew-service-install-failed: cannot initialize Windows elevation")?;
+                    let result = (|| -> Result<u32> {
+                        let mut info = SHELLEXECUTEINFOW {
+                            cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+                            fMask: SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC,
+                            lpVerb: w!("runas"),
+                            lpFile: PCWSTR(file.as_ptr()),
+                            lpParameters: PCWSTR(parameters.as_ptr()),
+                            nShow: SW_HIDE.0,
+                            ..Default::default()
+                        };
+                        if let Err(error) = ShellExecuteExW(&mut info) {
+                            if error.code() == ERROR_CANCELLED.to_hresult() {
+                                bail!("pewpew-service-install-cancelled");
+                            }
+                            bail!("pewpew-service-install-failed: {error}");
+                        }
+                        if info.hProcess.is_invalid() {
+                            bail!("pewpew-service-install-failed: no process handle");
+                        }
+                        let waited = WaitForSingleObject(info.hProcess, INFINITE);
+                        let mut code = 0u32;
+                        let exit = GetExitCodeProcess(info.hProcess, &mut code);
+                        let _ = CloseHandle(info.hProcess);
+                        if waited == WAIT_FAILED {
+                            bail!("pewpew-service-install-failed: could not wait for the installer");
+                        }
+                        exit.map_err(|error| anyhow!("pewpew-service-install-failed: {error}"))?;
+                        Ok(code)
+                    })();
+                    if com.is_ok() {
+                        CoUninitialize();
+                    }
+                    result
+                }
+            })
+            .join()
+            .map_err(|_| anyhow!("pewpew-service-install-failed: elevation thread panicked"))?
+    })
+}
+
+/// Console programs write UTF-8 (Rust) or the OEM code page (cmd.exe).
+#[cfg(target_os = "windows")]
+fn decode_console_output(bytes: &[u8]) -> String {
+    use windows::Win32::Globalization::{CP_OEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
+
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        return text.to_owned();
+    }
+    // SAFETY: both slices are valid for the duration of the calls.
+    unsafe {
+        let len = MultiByteToWideChar(CP_OEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0), bytes, None);
+        if len <= 0 {
+            return String::from_utf8_lossy(bytes).into_owned();
+        }
+        let mut wide = vec![0u16; len as usize];
+        let written = MultiByteToWideChar(CP_OEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0), bytes, Some(&mut wide));
+        String::from_utf16_lossy(&wide[..written.max(0) as usize])
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -678,7 +829,105 @@ pub static SERVICE_MANAGER: Lazy<Mutex<ServiceManager>> = Lazy::new(|| Mutex::ne
 
 #[cfg(test)]
 mod tests {
-    use super::{macos_service_admin_script, service_path_matches};
+    use super::{elevated_install_parameters, macos_service_admin_script, service_path_matches};
+    use std::path::Path;
+
+    #[test]
+    fn elevated_install_command_is_quoted_the_way_cmd_reads_it() -> anyhow::Result<()> {
+        let parameters = elevated_install_parameters(
+            Path::new(r"C:\Program Files\PewPew 云客户端\resources\clash-verge-service-install.exe"),
+            Path::new(r"C:\WINDOWS\system32\sc.exe"),
+            Path::new(r"C:\Users\A B\AppData\Roaming\com.pewpewcloud.client\logs\service-install.log"),
+        )
+        .ok_or_else(|| anyhow::anyhow!("ordinary paths must be accepted"))?;
+
+        // Backslash-escaped quotes are what broke the old `runas` version.
+        assert!(!parameters.contains(r#"\""#));
+        // `cmd /S /C` removes only the first and the last quote.
+        let command = parameters
+            .strip_prefix(r#"/D /V:OFF /S /C ""#)
+            .and_then(|rest| rest.strip_suffix('"'))
+            .ok_or_else(|| anyhow::anyhow!("the command must be wrapped in one pair of quotes"))?;
+        assert_eq!(
+            command,
+            concat!(
+                r#"("C:\Program Files\PewPew 云客户端\resources\clash-verge-service-install.exe""#,
+                r#" && "C:\WINDOWS\system32\sc.exe" config clash_verge_service DisplayName= "PewPew Background Service""#,
+                r#" && "C:\WINDOWS\system32\sc.exe" description clash_verge_service"#,
+                r#" "PewPew Background Service helps to launch the connection core")"#,
+                r#" > "C:\Users\A B\AppData\Roaming\com.pewpewcloud.client\logs\service-install.log" 2>&1"#,
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn elevated_install_command_rejects_paths_cmd_would_rewrite() {
+        let sc = Path::new(r"C:\WINDOWS\system32\sc.exe");
+        let log = Path::new(r"C:\logs\service-install.log");
+        for install in [r"C:\100%PATH%\install.exe", "C:\\bad\"quote\\install.exe", ""] {
+            assert_eq!(
+                elevated_install_parameters(Path::new(install), sc, log),
+                None,
+                "{install}"
+            );
+        }
+        let install = Path::new(r"C:\client\install.exe");
+        assert_eq!(
+            elevated_install_parameters(install, Path::new(r"C:\%PATH%\sc.exe"), log),
+            None
+        );
+        assert_eq!(
+            elevated_install_parameters(install, sc, Path::new(r"C:\%USER%\install.log")),
+            None
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn elevated_command_runs_in_windows_and_keeps_all_failure_output() -> anyhow::Result<()> {
+        use std::os::windows::process::CommandExt as _;
+
+        let root = std::env::temp_dir().join(format!("PewPew cmd 中文 & (test)! {}", nanoid::nanoid!()));
+        std::fs::create_dir(&root)?;
+        let result = (|| -> anyhow::Result<()> {
+            let install = root.join("install.cmd");
+            let sc = root.join("service-control.cmd");
+            let log = root.join("install.log");
+            let run = || -> anyhow::Result<std::process::Output> {
+                let parameters = elevated_install_parameters(&install, &sc, &log)
+                    .ok_or_else(|| anyhow::anyhow!("test paths must be accepted"))?;
+                Ok(std::process::Command::new(super::windows_system_dir()?.join("cmd.exe"))
+                    .raw_arg(parameters)
+                    .creation_flags(0x08000000)
+                    .output()?)
+            };
+            std::fs::write(
+                &install,
+                b"@echo off\r\necho INSTALL_OUT\r\necho INSTALL_ERR 1>&2\r\nexit /b 0\r\n",
+            )?;
+            std::fs::write(&sc, b"@echo off\r\necho SC_%1\r\nexit /b 0\r\n")?;
+            assert!(run()?.status.success());
+            let output = std::fs::read_to_string(&log)?;
+            for expected in ["INSTALL_OUT", "INSTALL_ERR", "SC_config", "SC_description"] {
+                assert!(output.contains(expected), "missing {expected}: {output}");
+            }
+
+            std::fs::write(&install, b"@echo off\r\necho INSTALL_DENIED 1>&2\r\nexit /b 7\r\n")?;
+            assert_eq!(run()?.status.code(), Some(7));
+            let output = std::fs::read_to_string(&log)?;
+            assert!(output.contains("INSTALL_DENIED"));
+            assert!(!output.contains("SC_"));
+
+            std::fs::write(&install, b"@echo off\r\nexit /b 0\r\n")?;
+            std::fs::write(&sc, b"@echo off\r\necho SERVICE_NAME_DENIED 1>&2\r\nexit /b 5\r\n")?;
+            assert_eq!(run()?.status.code(), Some(5));
+            assert!(std::fs::read_to_string(&log)?.contains("SERVICE_NAME_DENIED"));
+            Ok(())
+        })();
+        std::fs::remove_dir_all(&root)?;
+        result
+    }
 
     #[test]
     fn service_ownership_rejects_another_installation() {

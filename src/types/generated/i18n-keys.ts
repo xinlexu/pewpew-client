@@ -148,6 +148,8 @@ export const translationKeys = [
   'home.pewpew.compatibility.standardHint',
   'home.pewpew.compatibility.enhancedHint',
   'home.pewpew.compatibility.serviceUnavailable',
+  'home.pewpew.compatibility.permissionDenied',
+  'home.pewpew.compatibility.serviceInstallFailed',
   'home.pewpew.compatibility.switchToEnhanced',
   'home.pewpew.compatibility.summaryCoreDown',
   'home.pewpew.compatibility.summaryEnhancedActive',
