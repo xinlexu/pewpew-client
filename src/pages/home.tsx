@@ -1,36 +1,16 @@
+import { InfoOutlined, SettingsRounded } from '@mui/icons-material'
 import {
-  BuildRounded,
-  CloseRounded,
-  ContentCopyRounded,
-  EventAvailableRounded,
-  InfoOutlined,
-  RestartAltRounded,
-  SettingsRounded,
-  TravelExploreRounded,
-} from '@mui/icons-material'
-import {
-  Alert,
   Box,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  IconButton,
-  Link,
-  Paper,
+  ButtonBase,
   Stack,
-  Switch,
-  ToggleButton,
-  ToggleButtonGroup,
+  Tooltip,
   Typography,
   alpha,
   useTheme,
+  type Theme,
 } from '@mui/material'
-import type { Theme } from '@mui/material/styles'
 import { getVersion } from '@tauri-apps/api/app'
-import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import dayjs from 'dayjs'
 import {
   useCallback,
@@ -40,47 +20,91 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getBaseConfig } from 'tauri-plugin-mihomo-api'
 
 import pewpewLogo from '@/assets/pewpew-logo.jpg'
+import { AccountSummary } from '@/components/home/account-summary'
 import { ClashModeCard } from '@/components/home/clash-mode-card'
 import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
+import {
+  AboutDialog,
+  PreferencesDialog,
+} from '@/components/home/pewpew-dialogs'
+import {
+  PEWPEW_WECHAT_ID,
+  WECHAT_GREEN,
+  copyToClipboard,
+  glassOutlinedButtonSx,
+  hairlineColor,
+  isLightTheme,
+  pillButtonSx,
+  reducedMotion,
+  surfaceSx,
+} from '@/components/home/pewpew-ui'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
-import { useI18n } from '@/hooks/use-i18n'
+import {
+  refreshConnectionState,
+  useConnectionState,
+} from '@/hooks/use-connection-state'
 import { useProfiles } from '@/hooks/use-profiles'
-import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
+import { useRouteGuard, useRoutesBusy } from '@/hooks/use-route-guard'
 import { useVerge } from '@/hooks/use-verge'
 import {
   useAppRefreshers,
   useClashConfigData,
+  useCoreDataStatus,
   useProxiesData,
 } from '@/providers/app-data-context'
-import { enhanceProfiles, updateProfile } from '@/services/cmds'
+import { enhanceProfiles, patchClashMode, updateProfile } from '@/services/cmds'
 import delayManager from '@/services/delay'
-import type { ClientLanguageMode } from '@/services/i18n'
-import { getCachedClientLanguageMode } from '@/services/i18n'
 import { showNotice } from '@/services/notice-service'
 import {
   PEWPEW_LAST_YAML_PROFILE_KEY,
   PEWPEW_UNKNOWN_STATUS,
   PewPewAccountEvaluation,
-  PewPewSubscriptionStatus,
   evaluatePewPewAccountState,
   extractPewPewSubscriptionStatus,
   resolvePewPewProxyGroup,
 } from '@/utils/pewpew-client'
 
-const PEWPEW_BLUE = '#2869df'
-const WECHAT_GREEN = '#07c160'
 const AUTO_UPDATE_ROUTES_ON_STARTUP_KEY = 'pewpew-auto-update-routes-on-startup'
 
-const readAutoUpdateRoutesOnStartup = () =>
-  localStorage.getItem(AUTO_UPDATE_ROUTES_ON_STARTUP_KEY) !== 'false'
+// Blurred color fields (blue, violet, mint) that the glass cards sit on.
+const GLASS_BACKDROP = {
+  light: {
+    base: '#eef3fb',
+    fields: [
+      'radial-gradient(58% 66% at 6% 2%, rgba(147, 197, 253, 0.9), rgba(147, 197, 253, 0) 72%)',
+      'radial-gradient(50% 60% at 100% 36%, rgba(196, 181, 253, 0.78), rgba(196, 181, 253, 0) 72%)',
+      'radial-gradient(54% 50% at 42% 106%, rgba(153, 246, 228, 0.78), rgba(153, 246, 228, 0) 72%)',
+      '#eef3fb',
+    ].join(', '),
+  },
+  dark: {
+    base: '#0b1020',
+    fields: [
+      'radial-gradient(58% 66% at 6% 2%, rgba(37, 99, 235, 0.5), rgba(37, 99, 235, 0) 72%)',
+      'radial-gradient(50% 60% at 100% 36%, rgba(124, 58, 237, 0.38), rgba(124, 58, 237, 0) 72%)',
+      'radial-gradient(54% 50% at 42% 106%, rgba(13, 148, 136, 0.38), rgba(13, 148, 136, 0) 72%)',
+      '#0b1020',
+    ].join(', '),
+  },
+}
+
+const readAutoUpdateRoutesOnStartup = () => {
+  try {
+    return localStorage.getItem(AUTO_UPDATE_ROUTES_ON_STARTUP_KEY) !== 'false'
+  } catch {
+    return true
+  }
+}
 
 const writeAutoUpdateRoutesOnStartup = (enabled: boolean) => {
-  localStorage.setItem(AUTO_UPDATE_ROUTES_ON_STARTUP_KEY, String(enabled))
+  try {
+    localStorage.setItem(AUTO_UPDATE_ROUTES_ON_STARTUP_KEY, String(enabled))
+  } catch {}
 }
 
 const getReadableError = (error: unknown) => {
@@ -125,16 +149,29 @@ const getAccountBlockedContinueText = (
 const HomePage = () => {
   const theme = useTheme()
   const { i18n, t } = useTranslation()
-  const { current, mutateProfiles } = useProfiles()
+  const {
+    profiles,
+    current,
+    mutateProfiles,
+    error: profilesError,
+  } = useProfiles()
   const { proxies } = useProxiesData()
-  const { refreshAll } = useAppRefreshers()
+  const { refreshAll, refreshClashConfig } = useAppRefreshers()
   const { clashConfig } = useClashConfigData()
+  const { isCoreDataPending } = useCoreDataStatus()
   const { verge } = useVerge()
   const {
-    indicator: connectionEnabled,
-    setSystemProxyEnabled,
-    invalidateProxyState,
-  } = useSystemProxyState()
+    enabled: connectionEnabled,
+    setConnected,
+    mode: connectionMode,
+    tun: tunEnabled,
+    systemProxy: systemProxyEnabled,
+    busy: connectionBusy,
+  } = useConnectionState()
+  const { ensureValidRoute } = useRouteGuard()
+  const routesBusy = useRoutesBusy()
+  const [preparingConnection, setPreparingConnection] = useState(false)
+  const controlsBusy = connectionBusy || routesBusy || preparingConnection
   const [lineSyncing, setLineSyncing] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [preferencesOpen, setPreferencesOpen] = useState(false)
@@ -144,9 +181,13 @@ const HomePage = () => {
     readAutoUpdateRoutesOnStartup,
   )
   const [, refreshDelaySummary] = useReducer((value: number) => value + 1, 0)
-  const subscriptionCardRef = useRef<HTMLDivElement | null>(null)
   const startupUpdateRanRef = useRef(false)
-  const subscriptionStatus = extractPewPewSubscriptionStatus(current, proxies)
+  const routeRepairKeyRef = useRef('')
+
+  const subscriptionStatus = useMemo(
+    () => extractPewPewSubscriptionStatus(current, proxies),
+    [current, proxies],
+  )
   const accountEvaluation = useMemo(
     () => evaluatePewPewAccountState(subscriptionStatus),
     [subscriptionStatus],
@@ -157,15 +198,25 @@ const HomePage = () => {
     [proxies, clashConfig?.mode],
   )
 
-  const currentLineSummary = (() => {
-    if (lineSyncing) return { name: '', delayText: '' }
+  const profilesLoaded = profiles !== undefined || !!profilesError
+  // Keep the connection card while connected so the user can always disconnect.
+  const stage: 'loading' | 'onboarding' | 'hub' = !profilesLoaded
+    ? 'loading'
+    : current || connectionEnabled
+      ? 'hub'
+      : 'onboarding'
+  const hasUsableRoutes = proxyGroupResult.options.length > 0
+  const routesLoading =
+    stage === 'loading' || (isCoreDataPending && !hasUsableRoutes)
+  const currentLine =
+    proxyGroupResult.options.find(
+      (item) => item.name === proxyGroupResult.currentName,
+    ) ?? null
+  const currentRouteValid = !!currentLine
 
-    const { group, options, currentName } = proxyGroupResult
-    if (!group || !currentName) return { name: '', delayText: '' }
-
-    const currentLine = options.find((item) => item.name === currentName)
-    if (!currentLine) return { name: '', delayText: '' }
-
+  const currentDelayText = (() => {
+    const { group } = proxyGroupResult
+    if (!group || !currentLine) return ''
     const cachedDelay = delayManager.getDelayUpdate(
       currentLine.name,
       group.name,
@@ -174,41 +225,93 @@ const HomePage = () => {
       cachedDelay && cachedDelay.delay >= 0
         ? cachedDelay.delay
         : delayManager.getDelayFix(currentLine.record, group.name)
-    const delayText =
-      delay > 0 && delay < 10000
-        ? `${delayManager.formatDelay(delay)} ${t('home.pewpew.delay.unit')}`
-        : ''
-
-    return { name: currentLine.name, delayText }
+    return delay > 0 && delay < 10000
+      ? `${delayManager.formatDelay(delay)} ${t('home.pewpew.delay.unit')}`
+      : ''
   })()
-  const hasUsableRoutes = proxyGroupResult.options.length > 0
+
   const accountBlockedText = getAccountBlockedText(accountEvaluation, t)
   const accountBlockedContinueText = getAccountBlockedContinueText(
     accountEvaluation,
     t,
   )
+  const modeLabel =
+    clashConfig?.mode === 'global'
+      ? t('home.pewpew.connection.globalMode')
+      : clashConfig?.mode === 'direct'
+        ? t('home.pewpew.connection.directMode')
+        : t('home.pewpew.connection.smartMode')
+
+  const pendingLabel = routesLoading
+    ? t('home.pewpew.connectionStatus.loading')
+    : lineSyncing
+      ? t('home.pewpew.connectionStatus.updatingRoutes')
+      : undefined
+
+  const { statusDetail, statusTone } = ((): {
+    statusDetail?: string
+    statusTone: 'default' | 'warning' | 'error'
+  } => {
+    if (pendingLabel) return { statusTone: 'default' }
+    if (accountEvaluation.blocked)
+      return { statusDetail: accountBlockedText, statusTone: 'error' }
+    if (!hasUsableRoutes)
+      return {
+        statusDetail: t('home.pewpew.connection.noAvailableRoutes'),
+        statusTone: 'warning',
+      }
+    if (clashConfig?.mode === 'direct')
+      return {
+        statusDetail: connectionEnabled
+          ? t('home.pewpew.connection.directModeActive')
+          : t('home.pewpew.connection.directModeBeforeConnect'),
+        statusTone: 'warning',
+      }
+    if (!currentLine)
+      return {
+        statusDetail: connectionEnabled
+          ? t('home.pewpew.route.invalidWhileConnected')
+          : t('home.pewpew.route.noneSelected'),
+        statusTone: 'warning',
+      }
+    return {
+      statusDetail: [modeLabel, currentLine.name, currentDelayText]
+        .filter(Boolean)
+        .join(' · '),
+      statusTone: 'default',
+    }
+  })()
 
   const handleDelayUpdated = useCallback(() => {
     refreshDelaySummary()
   }, [])
 
+  const handleCopyWechat = useCallback(async () => {
+    try {
+      await copyToClipboard(PEWPEW_WECHAT_ID)
+      showNotice.success(t('home.pewpew.header.wechatCopied'))
+    } catch {
+      showNotice.error(t('home.pewpew.diagnostics.copyFailed'))
+    }
+  }, [t])
+
   const handleRepairNetwork = useCallback(async () => {
     setRepairingNetwork(true)
 
     try {
-      await setSystemProxyEnabled(false)
-      await invalidateProxyState()
+      await setConnected(false)
+      await refreshConnectionState()
       setLastConnectionError('')
       showNotice.success(t('home.pewpew.connectionStatus.repairSuccess'))
     } catch (error) {
       console.error('[PewPew] 恢复网络失败:', error)
-      setLastConnectionError(getReadableError(error))
+      setLastConnectionError(getReadableError(error) || 'repair-failed')
       showNotice.error(t('home.pewpew.connectionStatus.repairFailed'))
       throw error
     } finally {
       setRepairingNetwork(false)
     }
-  }, [invalidateProxyState, setSystemProxyEnabled, t])
+  }, [setConnected, t])
 
   const handleCopyDiagnostics = useCallback(async () => {
     try {
@@ -216,9 +319,10 @@ const HomePage = () => {
       const hasSubscriptionStatus = Object.values(subscriptionStatus).some(
         (value) => value !== PEWPEW_UNKNOWN_STATUS,
       )
-      const lastYamlProfileUid = localStorage.getItem(
-        PEWPEW_LAST_YAML_PROFILE_KEY,
-      )
+      let lastYamlProfileUid: string | null = null
+      try {
+        lastYamlProfileUid = localStorage.getItem(PEWPEW_LAST_YAML_PROFILE_KEY)
+      } catch {}
       const diagnostics = [
         'PewPew Cloud Client Diagnostics',
         `Version: ${appVersion}`,
@@ -226,7 +330,13 @@ const HomePage = () => {
         `Language: ${i18n.language || 'unknown'}`,
         `Theme: ${verge?.theme_mode ?? theme.palette.mode}`,
         `Connection: ${connectionEnabled ? 'connected' : 'disconnected'}`,
-        `Current route: ${currentLineSummary.name || 'not selected'}`,
+        `Connection mode: ${connectionMode}`,
+        `System proxy: ${systemProxyEnabled ? 'enabled' : 'disabled'}`,
+        `Enhanced routing: ${tunEnabled ? 'enabled' : 'disabled'}`,
+        `Route UDP capability: ${String(proxies?.records?.[proxyGroupResult.currentName]?.udp ?? 'unknown')}`,
+        'Voice connectivity: not tested',
+        `Current route: ${currentLine?.name || 'not selected'}`,
+        `Current route valid: ${currentRouteValid ? 'yes' : 'no'}`,
         `Mode: ${clashConfig?.mode || 'unknown'}`,
         `Last route update: ${
           current?.updated
@@ -251,12 +361,7 @@ const HomePage = () => {
         `Generated at: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
       ].join('\n')
 
-      try {
-        await writeText(diagnostics)
-      } catch {
-        await navigator.clipboard.writeText(diagnostics)
-      }
-
+      await copyToClipboard(diagnostics)
       showNotice.success(t('home.pewpew.diagnostics.copySuccess'))
     } catch (error) {
       console.error('[PewPew] 复制诊断信息失败:', error)
@@ -265,8 +370,14 @@ const HomePage = () => {
   }, [
     clashConfig?.mode,
     connectionEnabled,
+    connectionMode,
+    systemProxyEnabled,
+    tunEnabled,
+    proxies,
+    proxyGroupResult.currentName,
     current,
-    currentLineSummary.name,
+    currentLine?.name,
+    currentRouteValid,
     hasUsableRoutes,
     i18n.language,
     lastConnectionError,
@@ -288,12 +399,31 @@ const HomePage = () => {
     [],
   )
 
-  const handleImportGuide = useCallback(() => {
-    subscriptionCardRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    })
-  }, [])
+  const handleBeforeConnect = useCallback(async () => {
+    setPreparingConnection(true)
+    try {
+      const config = await getBaseConfig().catch(() => {
+        throw new Error('pewpew-core-unavailable')
+      })
+      // Connecting in direct mode would bypass every route; use Smart mode.
+      if (config.mode?.toLowerCase() === 'direct') {
+        if (!(await ensureValidRoute({ mode: 'rule' }))) return false
+        try {
+          await patchClashMode('rule')
+          await refreshClashConfig()
+          showNotice.info(t('home.pewpew.route.switchedToSmart'))
+        } catch (error) {
+          console.error('[PewPew] 切换到智能模式失败:', error)
+          showNotice.error(t('home.pewpew.connection.modeChangeFailed'))
+          return false
+        }
+        return true
+      }
+      return await ensureValidRoute({})
+    } finally {
+      setPreparingConnection(false)
+    }
+  }, [ensureValidRoute, refreshClashConfig, t])
 
   useEffect(() => {
     if (startupUpdateRanRef.current) return
@@ -303,7 +433,7 @@ const HomePage = () => {
       current.type !== 'remote'
     )
       return
-    if (connectionEnabled || lineSyncing) {
+    if (connectionEnabled || lineSyncing || connectionBusy) {
       startupUpdateRanRef.current = true
       return
     }
@@ -332,31 +462,58 @@ const HomePage = () => {
     current?.uid,
     current?.type,
     lineSyncing,
+    connectionBusy,
     mutateProfiles,
     refreshAll,
     t,
   ])
+
+  // While connected, never leave traffic on an info node or DIRECT: pick a
+  // real route (e.g. after the tray switches to global mode).
+  useEffect(() => {
+    if (currentRouteValid) {
+      routeRepairKeyRef.current = ''
+      return
+    }
+    if (!connectionEnabled || controlsBusy || lineSyncing) return
+    if (!hasUsableRoutes) return
+    const key = `${clashConfig?.mode}|${proxyGroupResult.group?.name}|${proxyGroupResult.currentName}`
+    if (routeRepairKeyRef.current === key) return
+    routeRepairKeyRef.current = key
+    void ensureValidRoute({})
+  }, [
+    clashConfig?.mode,
+    controlsBusy,
+    connectionEnabled,
+    currentRouteValid,
+    ensureValidRoute,
+    hasUsableRoutes,
+    lineSyncing,
+    proxyGroupResult.currentName,
+    proxyGroupResult.group?.name,
+  ])
+
+  const blockedFooter = accountEvaluation.blocked ? (
+    <Stack spacing={0.75} sx={{ alignItems: 'center', maxWidth: 380 }}>
+      <Button
+        variant="outlined"
+        onClick={() => void handleCopyWechat()}
+        startIcon={<WeChatBadge size={20} />}
+        sx={[glassOutlinedButtonSx, { px: 2 }]}
+      >
+        {t('home.pewpew.account.contactSupport')}
+      </Button>
+      <Typography variant="caption" color="text.secondary">
+        {t('home.pewpew.account.renewHint')}
+      </Typography>
+    </Stack>
+  ) : undefined
 
   return (
     <Box
       className="pewpew-shell"
       data-pewpew-theme={isDark ? 'dark' : 'light'}
       sx={{
-        '--pewpew-bg': isDark ? '#151922' : '#f4f7fb',
-        '--pewpew-panel': isDark
-          ? alpha(theme.palette.background.paper, 0.9)
-          : alpha(theme.palette.common.white, 0.92),
-        '--pewpew-panel-soft': isDark
-          ? alpha(theme.palette.background.paper, 0.84)
-          : alpha(theme.palette.common.white, 0.84),
-        '--pewpew-panel-muted': isDark
-          ? alpha(theme.palette.background.paper, 0.78)
-          : alpha(theme.palette.common.white, 0.72),
-        '--pewpew-border': alpha(PEWPEW_BLUE, isDark ? 0.14 : 0.08),
-        '--pewpew-primary-soft': alpha(PEWPEW_BLUE, isDark ? 0.16 : 0.075),
-        '--pewpew-input-bg': isDark
-          ? alpha(theme.palette.background.paper, 0.72)
-          : alpha(theme.palette.common.white, 0.92),
         position: 'relative',
         isolation: 'isolate',
         height: '100%',
@@ -366,34 +523,30 @@ const HomePage = () => {
         boxSizing: 'border-box',
         px: { xs: 2, md: 3 },
         py: { xs: 1.5, md: 2 },
-        bgcolor: 'var(--pewpew-bg)',
+        bgcolor: isDark ? GLASS_BACKDROP.dark.base : GLASS_BACKDROP.light.base,
+        // Soft color fields behind the glass cards; light and dark cross-fade.
         '&::before, &::after': {
           content: '""',
           position: 'fixed',
-          inset: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
           pointerEvents: 'none',
           transition: 'opacity 320ms ease',
         },
         '&::before': {
           zIndex: -2,
           opacity: isDark ? 0 : 1,
-          background:
-            'radial-gradient(circle at 50% -12%, rgba(40,105,223,0.16), transparent 34%), linear-gradient(145deg, #f4f7fb 0%, #eef5fb 48%, #f8fafc 100%)',
+          background: GLASS_BACKDROP.light.fields,
         },
         '&::after': {
           zIndex: -1,
           opacity: isDark ? 1 : 0,
-          background:
-            'radial-gradient(circle at 50% -10%, rgba(40,105,223,0.22), transparent 32%), linear-gradient(145deg, #151922 0%, #1d2430 52%, #171b24 100%)',
+          background: GLASS_BACKDROP.dark.fields,
         },
-        '&, & .pewpew-transition': {
-          transition:
-            'background-color 280ms ease, color 240ms ease, border-color 280ms ease, box-shadow 280ms ease, opacity 240ms ease',
-        },
-        '@media (prefers-reduced-motion: reduce)': {
-          '&, & .pewpew-transition, &::before, &::after': {
-            transition: 'none !important',
-          },
+        [reducedMotion]: {
+          '&::before, &::after': { transition: 'none' },
         },
       }}
     >
@@ -404,7 +557,7 @@ const HomePage = () => {
           position: 'relative',
           zIndex: 1,
           width: '100%',
-          maxWidth: 1080,
+          maxWidth: 980,
           mx: 'auto',
           pb: 3,
           boxSizing: 'border-box',
@@ -413,40 +566,92 @@ const HomePage = () => {
         <PewPewHeader
           onAbout={() => setAboutOpen(true)}
           onPreferences={() => setPreferencesOpen(true)}
+          onCopyWechat={() => void handleCopyWechat()}
         />
 
-        <MainConnectPanel
-          currentLine={currentLineSummary}
-          accountBlockedContinueText={accountBlockedContinueText}
-          accountEvaluation={accountEvaluation}
-          accountBlockedText={accountBlockedText}
-          disabled={lineSyncing}
-          hasRoute={hasUsableRoutes}
-          onConnectionError={setLastConnectionError}
-          onCopyDiagnostics={handleCopyDiagnostics}
-          onRepairNetwork={handleRepairNetwork}
-          repairing={repairingNetwork}
-          status={subscriptionStatus}
-        />
+        {stage !== 'onboarding' && (
+          <Box
+            component="section"
+            aria-label={t('home.pewpew.connectionStatus.title')}
+            sx={[
+              surfaceSx('primary'),
+              { px: { xs: 2, sm: 3 }, py: { xs: 2.5, sm: 2.75 } },
+            ]}
+          >
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: '1fr',
+                  md: 'minmax(0, 1fr) minmax(0, 1fr)',
+                },
+                gap: { xs: 3, md: 4 },
+                alignItems: 'start',
+              }}
+            >
+              <ProxyTunCard
+                connectionBlocked={accountEvaluation.blocked}
+                connectionBlockedText={accountBlockedContinueText}
+                disabled={
+                  (routesLoading && !connectionEnabled) ||
+                  lineSyncing ||
+                  routesBusy ||
+                  preparingConnection
+                }
+                hasRoute={hasUsableRoutes}
+                onConnectionError={setLastConnectionError}
+                connectionError={lastConnectionError}
+                onCopyDiagnostics={handleCopyDiagnostics}
+                onRepairNetwork={handleRepairNetwork}
+                repairing={repairingNetwork}
+                statusDetail={statusDetail}
+                statusTone={statusTone}
+                pendingLabel={pendingLabel}
+                beforeConnect={handleBeforeConnect}
+                footer={blockedFooter}
+              />
 
-        {!hasUsableRoutes && !accountEvaluation.blocked && (
-          <GettingStartedCard onImportRoutes={handleImportGuide} />
+              <Stack
+                spacing={2.25}
+                sx={(theme) => ({
+                  minWidth: 0,
+                  [theme.breakpoints.up('md')]: {
+                    pl: 4,
+                    borderLeft: `1px solid ${hairlineColor(theme)}`,
+                  },
+                })}
+              >
+                <CurrentProxyCard
+                  embedded
+                  loading={stage === 'loading'}
+                  disabled={lineSyncing || controlsBusy}
+                  routeBlocked={accountEvaluation.blocked}
+                  routeBlockedText={accountBlockedText}
+                  onDelayUpdated={handleDelayUpdated}
+                />
+                <ClashModeCard
+                  disabled={lineSyncing || routesLoading || controlsBusy}
+                />
+                <AccountSummary
+                  status={subscriptionStatus}
+                  evaluation={accountEvaluation}
+                  profile={current}
+                  loading={routesLoading}
+                />
+              </Stack>
+            </Box>
+          </Box>
         )}
 
-        <ConnectionSettingsCard
-          accountEvaluation={accountEvaluation}
-          accountBlockedText={accountBlockedText}
-          onDelayUpdated={handleDelayUpdated}
-        />
-
-        <Box ref={subscriptionCardRef}>
+        {stage !== 'loading' && (
           <HomeProfileCard
+            variant={stage === 'onboarding' ? 'onboarding' : 'compact'}
             current={current}
-            busy={lineSyncing}
+            busy={lineSyncing || controlsBusy}
             onProfileUpdated={mutateProfiles}
             onSyncingChange={setLineSyncing}
           />
-        </Box>
+        )}
       </Stack>
 
       <AboutDialog
@@ -472,11 +677,27 @@ const HomePage = () => {
 const PewPewHeader = ({
   onAbout,
   onPreferences,
+  onCopyWechat,
 }: {
   onAbout: () => void
   onPreferences: () => void
+  onCopyWechat: () => void
 }) => {
   const { t } = useTranslation()
+
+  const headerButtonSx = (theme: Theme) => ({
+    ...pillButtonSx,
+    minWidth: { xs: 40, sm: 64 },
+    height: 40,
+    px: { xs: 1, sm: 1.5 },
+    color: 'text.primary',
+    '& .MuiButton-startIcon': { mr: { xs: 0, sm: 0.75 }, ml: { xs: 0 } },
+    '&:hover': {
+      bgcolor: isLightTheme(theme)
+        ? alpha('#ffffff', 0.55)
+        : alpha('#ffffff', 0.07),
+    },
+  })
 
   return (
     <Box
@@ -484,11 +705,10 @@ const PewPewHeader = ({
       data-tauri-drag-region="true"
       sx={{
         display: 'flex',
-        flexDirection: { xs: 'column', sm: 'row' },
-        alignItems: { xs: 'stretch', sm: 'center' },
+        alignItems: 'center',
         justifyContent: 'space-between',
         gap: 1.5,
-        minHeight: 58,
+        minHeight: 56,
       }}
     >
       <Stack
@@ -500,25 +720,28 @@ const PewPewHeader = ({
         <Box
           component="img"
           src={pewpewLogo}
-          alt="PewPew 云"
+          alt=""
           data-tauri-drag-region="false"
-          sx={{
-            width: { xs: 54, sm: 58 },
-            height: { xs: 54, sm: 58 },
+          sx={(theme) => ({
+            width: { xs: 42, sm: 46 },
+            height: { xs: 42, sm: 46 },
             objectFit: 'cover',
-            objectPosition: 'center',
-            borderRadius: 2.5,
+            borderRadius: '14px',
             flexShrink: 0,
-          }}
+            boxShadow: isLightTheme(theme)
+              ? '0 8px 20px rgba(36, 87, 214, 0.25) !important'
+              : '0 8px 20px rgba(0, 0, 0, 0.4) !important',
+          })}
         />
-
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0 }} data-tauri-drag-region="true">
           <Typography
             variant="h5"
+            component="h1"
+            noWrap
             sx={{
-              fontWeight: 900,
-              lineHeight: 1.12,
-              fontSize: { xs: 20, sm: 24 },
+              fontWeight: 800,
+              lineHeight: 1.2,
+              fontSize: { xs: 18, sm: 21 },
             }}
           >
             {t('home.pewpew.header.title')}
@@ -526,7 +749,8 @@ const PewPewHeader = ({
           <Typography
             variant="body2"
             color="text.secondary"
-            sx={{ mt: 0.35, fontWeight: 600 }}
+            noWrap
+            sx={{ mt: 0.25, fontWeight: 500, fontSize: { xs: 12.5, sm: 13.5 } }}
           >
             {t('home.pewpew.header.subtitle')}
           </Typography>
@@ -535,85 +759,124 @@ const PewPewHeader = ({
 
       <Stack
         direction="row"
-        spacing={1}
+        spacing={{ xs: 0.25, sm: 0.75 }}
         data-tauri-drag-region="false"
-        sx={{
-          alignItems: 'center',
-          justifyContent: { xs: 'space-between', sm: 'flex-end' },
-          flexShrink: 0,
-          flexWrap: 'wrap',
-          width: { xs: '100%', sm: 'auto' },
-        }}
+        sx={{ alignItems: 'center', flexShrink: 0 }}
       >
-        <Stack
-          direction="row"
-          spacing={0.75}
-          sx={(theme) => ({
-            alignItems: 'center',
-            px: 1.1,
-            py: 0.65,
-            borderRadius: 999,
-            color: theme.palette.text.primary,
-            bgcolor:
-              theme.palette.mode === 'light'
-                ? alpha(theme.palette.common.white, 0.78)
-                : alpha(theme.palette.common.white, 0.08),
-            border: `1px solid ${alpha(WECHAT_GREEN, 0.2)}`,
-          })}
-        >
-          <Box
-            sx={{
-              width: 24,
-              height: 24,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: WECHAT_GREEN,
-              color: '#fff',
-              flexShrink: 0,
+        <Tooltip title={t('home.pewpew.header.copyWechat')}>
+          <ButtonBase
+            onClick={onCopyWechat}
+            aria-label={`${t('home.pewpew.header.wechat')} · ${t('home.pewpew.header.copyWechat')}`}
+            sx={(theme) => {
+              const light = isLightTheme(theme)
+              return {
+                height: 40,
+                pl: 0.75,
+                pr: { xs: 0.75, sm: 1.5 },
+                gap: 0.75,
+                borderRadius: 999,
+                color: 'text.primary',
+                bgcolor: {
+                  xs: 'transparent',
+                  sm: light ? alpha('#ffffff', 0.55) : alpha('#ffffff', 0.06),
+                },
+                border: {
+                  xs: '1px solid transparent',
+                  sm: `1px solid ${light ? alpha('#ffffff', 0.85) : alpha('#ffffff', 0.12)}`,
+                },
+                WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+                backdropFilter: 'blur(16px) saturate(160%)',
+                boxShadow: {
+                  xs: 'none',
+                  sm: light
+                    ? '0 6px 18px rgba(40, 70, 140, 0.1) !important'
+                    : 'none',
+                },
+                transition: 'background-color 160ms ease',
+                '&:hover': {
+                  bgcolor: alpha(WECHAT_GREEN, light ? 0.12 : 0.14),
+                },
+              }
             }}
           >
-            <WeChatIcon />
-          </Box>
-          <Typography variant="body2" sx={{ fontWeight: 800 }}>
-            {t('home.pewpew.header.wechat')}
-          </Typography>
-        </Stack>
+            <WeChatBadge size={24} />
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 700,
+                display: { xs: 'none', sm: 'block' },
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t('home.pewpew.header.wechat')}
+            </Typography>
+          </ButtonBase>
+        </Tooltip>
 
-        <Button
-          size="small"
-          variant="text"
-          color="inherit"
-          startIcon={<SettingsRounded />}
-          onClick={onPreferences}
-          sx={{ borderRadius: 999, px: 1.15, fontWeight: 700 }}
-        >
-          {t('home.pewpew.header.preferences')}
-        </Button>
+        <Tooltip title={t('home.pewpew.header.preferences')}>
+          <Button
+            variant="text"
+            startIcon={<SettingsRounded />}
+            onClick={onPreferences}
+            aria-label={t('home.pewpew.header.preferences')}
+            sx={headerButtonSx}
+          >
+            <Box
+              component="span"
+              sx={{ display: { xs: 'none', sm: 'inline' } }}
+            >
+              {t('home.pewpew.header.preferences')}
+            </Box>
+          </Button>
+        </Tooltip>
 
-        <Button
-          size="small"
-          variant="text"
-          color="inherit"
-          startIcon={<InfoOutlined />}
-          onClick={onAbout}
-          sx={{ borderRadius: 999, px: 1.15, fontWeight: 700 }}
-        >
-          {t('home.pewpew.header.about')}
-        </Button>
+        <Tooltip title={t('home.pewpew.header.about')}>
+          <Button
+            variant="text"
+            startIcon={<InfoOutlined />}
+            onClick={onAbout}
+            aria-label={t('home.pewpew.header.about')}
+            sx={headerButtonSx}
+          >
+            <Box
+              component="span"
+              sx={{ display: { xs: 'none', sm: 'inline' } }}
+            >
+              {t('home.pewpew.header.about')}
+            </Box>
+          </Button>
+        </Tooltip>
       </Stack>
     </Box>
   )
 }
 
-const WeChatIcon = () => {
+const WeChatBadge = ({ size = 24 }: { size?: number }) => (
+  <Box
+    aria-hidden
+    sx={{
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      bgcolor: WECHAT_GREEN,
+      color: '#fff',
+      flexShrink: 0,
+    }}
+  >
+    <WeChatIcon size={Math.round(size * 0.7)} />
+  </Box>
+)
+
+const WeChatIcon = ({ size = 17 }: { size?: number }) => {
   return (
     <Box
       component="svg"
       viewBox="0 0 32 32"
       aria-hidden="true"
-      sx={{ width: 17, height: 17, display: 'block' }}
+      sx={{ width: size, height: size, display: 'block' }}
     >
       <ellipse cx="13.2" cy="14.2" rx="7.8" ry="5.8" fill="#fff" />
       <path
@@ -638,930 +901,6 @@ const WeChatIcon = () => {
       <circle cx="17.7" cy="18.4" r="0.75" fill={WECHAT_GREEN} />
       <circle cx="21.4" cy="18.4" r="0.75" fill={WECHAT_GREEN} />
     </Box>
-  )
-}
-
-const MainConnectPanel = ({
-  accountBlockedContinueText,
-  accountBlockedText,
-  accountEvaluation,
-  currentLine,
-  disabled,
-  hasRoute,
-  onConnectionError,
-  onCopyDiagnostics,
-  onRepairNetwork,
-  repairing,
-  status,
-}: {
-  accountBlockedContinueText: string
-  accountBlockedText: string
-  accountEvaluation: PewPewAccountEvaluation
-  currentLine: { name: string; delayText: string }
-  disabled: boolean
-  hasRoute: boolean
-  onConnectionError: (message: string) => void
-  onCopyDiagnostics: () => Promise<void>
-  onRepairNetwork: () => Promise<void>
-  repairing: boolean
-  status: PewPewSubscriptionStatus
-}) => {
-  return (
-    <Paper
-      className="pewpew-transition"
-      elevation={0}
-      sx={(theme) => ({
-        borderRadius: 5,
-        px: { xs: 2, md: 3 },
-        py: { xs: 2.25, md: 3 },
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        bgcolor: 'var(--pewpew-panel)',
-        border: `1px solid ${alpha(PEWPEW_BLUE, 0.1)}`,
-        boxShadow:
-          theme.palette.mode === 'light'
-            ? '0 26px 80px rgba(40, 70, 120, 0.14)'
-            : '0 26px 80px rgba(0, 0, 0, 0.28)',
-      })}
-    >
-      <Stack spacing={2} sx={{ alignItems: 'center', minWidth: 0 }}>
-        <Box sx={{ width: '100%', maxWidth: 440 }}>
-          <ProxyTunCard
-            connectionBlocked={accountEvaluation.blocked}
-            connectionBlockedText={accountBlockedContinueText}
-            disabled={disabled}
-            hasRoute={hasRoute}
-            onConnectionError={onConnectionError}
-            onCopyDiagnostics={onCopyDiagnostics}
-            onRepairNetwork={onRepairNetwork}
-            repairing={repairing}
-          />
-        </Box>
-
-        <LineSummaryChip
-          accountEvaluation={accountEvaluation}
-          blockedText={accountBlockedText}
-          currentLine={currentLine}
-        />
-
-        <SubscriptionStatusCard
-          accountEvaluation={accountEvaluation}
-          status={status}
-        />
-      </Stack>
-    </Paper>
-  )
-}
-
-const LineSummaryChip = ({
-  accountEvaluation,
-  blockedText,
-  currentLine,
-}: {
-  accountEvaluation: PewPewAccountEvaluation
-  blockedText: string
-  currentLine: { name: string; delayText: string }
-}) => {
-  const { t } = useTranslation()
-  const text = accountEvaluation.blocked
-    ? blockedText
-    : !currentLine.name
-      ? t('home.pewpew.switch.currentRouteEmpty')
-      : currentLine.delayText
-        ? t('home.pewpew.switch.currentRouteWithDelay', {
-            name: currentLine.name,
-            delay: currentLine.delayText,
-          })
-        : t('home.pewpew.switch.currentRoute', { name: currentLine.name })
-
-  return (
-    <Box
-      sx={(theme) => ({
-        maxWidth: '100%',
-        px: 1.6,
-        py: 0.8,
-        borderRadius: 999,
-        boxSizing: 'border-box',
-        color: theme.palette.text.primary,
-        bgcolor:
-          theme.palette.mode === 'light'
-            ? alpha(
-                accountEvaluation.blocked
-                  ? theme.palette.error.main
-                  : PEWPEW_BLUE,
-                0.075,
-              )
-            : alpha(
-                accountEvaluation.blocked
-                  ? theme.palette.error.main
-                  : PEWPEW_BLUE,
-                0.16,
-              ),
-        border: `1px solid ${alpha(
-          accountEvaluation.blocked ? theme.palette.error.main : PEWPEW_BLUE,
-          0.14,
-        )}`,
-      })}
-    >
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 800,
-          textAlign: 'center',
-          overflowWrap: 'anywhere',
-        }}
-      >
-        {text}
-      </Typography>
-    </Box>
-  )
-}
-
-const SubscriptionStatusCard = ({
-  accountEvaluation,
-  status,
-}: {
-  accountEvaluation: PewPewAccountEvaluation
-  status: PewPewSubscriptionStatus
-}) => {
-  const { i18n, t } = useTranslation()
-  const alert =
-    accountEvaluation.state === 'expired'
-      ? {
-          severity: 'error' as const,
-          key: 'home.pewpew.account.planExpiredContinue',
-        }
-      : accountEvaluation.state === 'dataExhausted'
-        ? {
-            severity: 'error' as const,
-            key: 'home.pewpew.account.dataExhaustedContinue',
-          }
-        : accountEvaluation.state === 'expiringSoon'
-          ? {
-              severity: 'warning' as const,
-              key: 'home.pewpew.account.expiringSoon',
-            }
-          : accountEvaluation.state === 'dataLow'
-            ? {
-                severity: 'warning' as const,
-                key: 'home.pewpew.account.lowData',
-              }
-            : null
-  const formatStatusValue = (value: string) => {
-    if (value === PEWPEW_UNKNOWN_STATUS) {
-      return t('home.pewpew.account.unavailable')
-    }
-    if (/(?:长期有效|lifetime|unlimited)/i.test(value)) {
-      return t('home.pewpew.account.lifetime')
-    }
-    if (i18n.language === 'en') {
-      return value.replace(/^(\d+)\s*天$/, (_, days) => `${days} days`)
-    }
-    return value
-  }
-  const items = [
-    {
-      label: t('home.pewpew.account.remainingTraffic'),
-      value: formatStatusValue(status.remainingTraffic),
-      icon: <TravelExploreRounded fontSize="small" />,
-    },
-    {
-      label: t('home.pewpew.account.nextReset'),
-      value: formatStatusValue(status.nextReset),
-      icon: <RestartAltRounded fontSize="small" />,
-    },
-    {
-      label: t('home.pewpew.account.expire'),
-      value: formatStatusValue(status.expire),
-      icon: <EventAvailableRounded fontSize="small" />,
-    },
-  ]
-
-  return (
-    <Stack
-      spacing={1.25}
-      sx={{
-        width: '100%',
-        maxWidth: 760,
-        minWidth: 0,
-        boxSizing: 'border-box',
-      }}
-    >
-      <Typography
-        variant="subtitle2"
-        sx={{ fontWeight: 850, textAlign: 'center' }}
-      >
-        {t('home.pewpew.account.title')}
-      </Typography>
-
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            sm: 'repeat(3, minmax(0, 1fr))',
-          },
-          gap: 1,
-          width: '100%',
-          minWidth: 0,
-          boxSizing: 'border-box',
-        }}
-      >
-        {items.map((item) => (
-          <Box
-            key={item.label}
-            sx={(theme) => ({
-              minHeight: 82,
-              minWidth: 0,
-              borderRadius: 3,
-              border: `1px solid ${alpha(PEWPEW_BLUE, 0.09)}`,
-              px: 1.45,
-              py: 1.2,
-              boxSizing: 'border-box',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              gap: 0.65,
-              bgcolor:
-                theme.palette.mode === 'light'
-                  ? alpha(PEWPEW_BLUE, 0.04)
-                  : alpha(PEWPEW_BLUE, 0.12),
-            })}
-          >
-            <Stack
-              direction="row"
-              spacing={0.75}
-              sx={{ alignItems: 'center', minWidth: 0 }}
-            >
-              <Box sx={{ color: PEWPEW_BLUE, display: 'flex' }}>
-                {item.icon}
-              </Box>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ fontWeight: 750 }}
-              >
-                {item.label}
-              </Typography>
-            </Stack>
-            <Typography
-              sx={{
-                fontSize: { xs: 17, sm: 18 },
-                fontWeight: 900,
-                lineHeight: 1.18,
-                overflowWrap: 'anywhere',
-              }}
-            >
-              {item.value}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
-
-      {alert && (
-        <Alert
-          key={alert.key}
-          severity={alert.severity}
-          variant="outlined"
-          sx={{ borderRadius: 3, py: 0.35, alignItems: 'center' }}
-        >
-          {t(alert.key)}
-        </Alert>
-      )}
-    </Stack>
-  )
-}
-
-const GettingStartedCard = ({
-  onImportRoutes,
-}: {
-  onImportRoutes: () => void
-}) => {
-  const { t } = useTranslation()
-  const steps = [
-    t('home.pewpew.onboarding.stepPaste'),
-    t('home.pewpew.onboarding.stepImport'),
-    t('home.pewpew.onboarding.stepConnect'),
-  ]
-
-  return (
-    <Paper
-      className="pewpew-transition"
-      elevation={0}
-      sx={(theme) => ({
-        borderRadius: 4,
-        p: { xs: 2, md: 2.35 },
-        bgcolor:
-          theme.palette.mode === 'light'
-            ? alpha(PEWPEW_BLUE, 0.055)
-            : alpha(PEWPEW_BLUE, 0.13),
-        border: `1px solid ${alpha(PEWPEW_BLUE, 0.12)}`,
-        boxSizing: 'border-box',
-      })}
-    >
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        spacing={1.5}
-        sx={{
-          alignItems: { xs: 'stretch', md: 'center' },
-          justifyContent: 'space-between',
-        }}
-      >
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h6" sx={{ fontWeight: 850, mb: 0.75 }}>
-            {t('home.pewpew.onboarding.title')}
-          </Typography>
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            spacing={1}
-            sx={{ flexWrap: 'wrap' }}
-          >
-            {steps.map((step, index) => (
-              <Typography
-                key={step}
-                variant="body2"
-                color="text.secondary"
-                sx={{ fontWeight: 700 }}
-              >
-                {index + 1}. {step}
-              </Typography>
-            ))}
-          </Stack>
-        </Box>
-        <Button
-          variant="contained"
-          onClick={onImportRoutes}
-          sx={{ borderRadius: 999, fontWeight: 850, flexShrink: 0 }}
-        >
-          {t('home.pewpew.onboarding.importRoutes')}
-        </Button>
-      </Stack>
-    </Paper>
-  )
-}
-
-const ConnectionSettingsCard = ({
-  accountBlockedText,
-  accountEvaluation,
-  onDelayUpdated,
-}: {
-  accountBlockedText: string
-  accountEvaluation: PewPewAccountEvaluation
-  onDelayUpdated: () => void
-}) => {
-  const { t } = useTranslation()
-
-  return (
-    <Paper
-      className="pewpew-transition"
-      elevation={0}
-      sx={(theme) => ({
-        borderRadius: 4,
-        p: { xs: 2, md: 2.5 },
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        bgcolor: 'var(--pewpew-panel-soft)',
-        border: `1px solid ${alpha(PEWPEW_BLUE, 0.08)}`,
-        boxShadow:
-          theme.palette.mode === 'light'
-            ? '0 14px 38px rgba(40, 70, 120, 0.07)'
-            : '0 14px 38px rgba(0, 0, 0, 0.2)',
-      })}
-    >
-      <Stack spacing={1.75}>
-        <Typography variant="h6" sx={{ fontWeight: 850 }}>
-          {t('home.pewpew.connection.title')}
-        </Typography>
-
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: '1fr',
-              md: 'minmax(0, 1.2fr) minmax(360px, 0.8fr)',
-            },
-            gap: 2.25,
-            minWidth: 0,
-            alignItems: 'stretch',
-          }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <CurrentProxyCard
-              embedded
-              routeBlocked={accountEvaluation.blocked}
-              routeBlockedText={accountBlockedText}
-              onDelayUpdated={onDelayUpdated}
-            />
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Stack spacing={1} sx={{ height: '100%' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 850 }}>
-                {t('home.pewpew.connection.mode')}
-              </Typography>
-              <ClashModeCard />
-            </Stack>
-          </Box>
-        </Box>
-      </Stack>
-    </Paper>
-  )
-}
-
-type PreferencePatch = Pick<
-  IVergeConfig,
-  | 'theme_mode'
-  | 'enable_auto_launch'
-  | 'enable_silent_start'
-  | 'enable_system_proxy'
-  | 'auto_close_connection'
->
-
-const PreferencesDialog = ({
-  autoUpdateRoutesOnStartup,
-  open,
-  onClose,
-  onAutoUpdateRoutesOnStartupChange,
-  onCopyDiagnostics,
-  onRepairNetwork,
-  repairingNetwork,
-}: {
-  autoUpdateRoutesOnStartup: boolean
-  open: boolean
-  onClose: () => void
-  onAutoUpdateRoutesOnStartupChange: (enabled: boolean) => void
-  onCopyDiagnostics: () => Promise<void>
-  onRepairNetwork: () => Promise<void>
-  repairingNetwork: boolean
-}) => {
-  const { t } = useTranslation()
-  const { verge, mutateVerge, patchVerge } = useVerge()
-  const { current } = useProfiles()
-  const { switchClientLanguageMode, isLoading: languageLoading } = useI18n()
-  const [languageMode, setLanguageMode] = useState<ClientLanguageMode>(
-    () => getCachedClientLanguageMode() ?? 'system',
-  )
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      queueMicrotask(() =>
-        setLanguageMode(getCachedClientLanguageMode() ?? 'system'),
-      )
-    }
-  }, [open])
-
-  const updatePreference = async (patch: Partial<PreferencePatch>) => {
-    setSaving(true)
-    mutateVerge((prev) => (prev ? { ...prev, ...patch } : prev), false)
-
-    try {
-      await patchVerge(patch)
-    } catch (error) {
-      console.error('[PewPew] 偏好设置保存失败:', error)
-      showNotice.error(t('home.pewpew.preferences.saveFailed'))
-      mutateVerge()
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleThemeModeChange = (_event: unknown, value: string | null) => {
-    if (!value) return
-    void updatePreference({
-      theme_mode: value as NonNullable<IVergeConfig['theme_mode']>,
-    })
-  }
-
-  const handleLanguageModeChange = async (
-    _event: unknown,
-    value: ClientLanguageMode | null,
-  ) => {
-    if (!value) return
-    const previous = languageMode
-    setLanguageMode(value)
-
-    try {
-      await switchClientLanguageMode(value)
-    } catch {
-      setLanguageMode(previous)
-      showNotice.error(t('home.pewpew.preferences.saveFailed'))
-    }
-  }
-
-  const preferenceDisabled = saving || languageLoading
-  const themeMode = verge?.theme_mode ?? 'system'
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      slotProps={{
-        paper: {
-          sx: {
-            borderRadius: 4,
-            transition:
-              'background-color 280ms ease, color 240ms ease, border-color 280ms ease, box-shadow 280ms ease',
-          },
-        },
-      }}
-    >
-      <DialogTitle sx={{ pr: 6, fontWeight: 850 }}>
-        {t('home.pewpew.preferences.title')}
-        <IconButton
-          aria-label={t('home.pewpew.about.close')}
-          onClick={onClose}
-          sx={{ position: 'absolute', right: 12, top: 10 }}
-        >
-          <CloseRounded />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent dividers>
-        <Stack spacing={2.25}>
-          <PreferenceSection title={t('home.pewpew.preferences.appearance')}>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={themeMode}
-              onChange={handleThemeModeChange}
-              disabled={preferenceDisabled}
-              sx={preferenceControlSx}
-            >
-              <ToggleButton value="system">
-                {t('home.pewpew.preferences.followSystem')}
-              </ToggleButton>
-              <ToggleButton value="light">
-                {t('home.pewpew.preferences.light')}
-              </ToggleButton>
-              <ToggleButton value="dark">
-                {t('home.pewpew.preferences.dark')}
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </PreferenceSection>
-
-          <PreferenceSection title={t('home.pewpew.preferences.language')}>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={languageMode}
-              onChange={handleLanguageModeChange}
-              disabled={preferenceDisabled}
-              sx={preferenceControlSx}
-            >
-              <ToggleButton value="system">
-                {t('home.pewpew.preferences.followSystem')}
-              </ToggleButton>
-              <ToggleButton value="zh-CN">
-                {t('home.pewpew.preferences.simplifiedChinese')}
-              </ToggleButton>
-              <ToggleButton value="en-US">
-                {t('home.pewpew.preferences.english')}
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </PreferenceSection>
-
-          <PreferenceSection title={t('home.pewpew.preferences.startup')}>
-            <Stack spacing={0.25}>
-              <PreferenceSwitch
-                label={t('home.pewpew.preferences.autoLaunch')}
-                checked={verge?.enable_auto_launch ?? false}
-                disabled={preferenceDisabled}
-                onChange={(checked) =>
-                  void updatePreference({ enable_auto_launch: checked })
-                }
-              />
-              <PreferenceSwitch
-                label={t('home.pewpew.preferences.silentStart')}
-                checked={verge?.enable_silent_start ?? false}
-                disabled={preferenceDisabled}
-                onChange={(checked) =>
-                  void updatePreference({ enable_silent_start: checked })
-                }
-              />
-              <PreferenceSwitch
-                label={t('home.pewpew.preferences.autoUpdateRoutesOnStartup')}
-                checked={autoUpdateRoutesOnStartup}
-                disabled={preferenceDisabled}
-                onChange={onAutoUpdateRoutesOnStartupChange}
-              />
-              <PreferenceSwitch
-                label={t('home.pewpew.preferences.autoStartPewPew')}
-                checked={verge?.enable_system_proxy ?? false}
-                disabled={preferenceDisabled}
-                onChange={(checked) => {
-                  if (checked && !current?.uid) {
-                    showNotice.error(t('home.pewpew.connection.importFirst'))
-                    return
-                  }
-                  void updatePreference({ enable_system_proxy: checked })
-                }}
-              />
-            </Stack>
-          </PreferenceSection>
-
-          <PreferenceSection title={t('home.pewpew.preferences.safety')}>
-            <PreferenceSwitch
-              label={t('home.pewpew.preferences.autoCloseOnQuit')}
-              checked={verge?.auto_close_connection ?? true}
-              disabled={preferenceDisabled}
-              onChange={(checked) =>
-                void updatePreference({ auto_close_connection: checked })
-              }
-            />
-          </PreferenceSection>
-
-          <Divider />
-
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            spacing={1}
-            sx={{ justifyContent: 'flex-end' }}
-          >
-            <Button
-              variant="outlined"
-              onClick={() => void onRepairNetwork()}
-              disabled={preferenceDisabled || repairingNetwork}
-              startIcon={<BuildRounded />}
-              sx={{ borderRadius: 999, fontWeight: 800 }}
-            >
-              {t('home.pewpew.connectionStatus.repairNetwork')}
-            </Button>
-            <Button
-              variant="text"
-              onClick={() => void onCopyDiagnostics()}
-              startIcon={<ContentCopyRounded />}
-              sx={{ borderRadius: 999, fontWeight: 800 }}
-            >
-              {t('home.pewpew.diagnostics.copy')}
-            </Button>
-          </Stack>
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={onClose} sx={{ borderRadius: 999, fontWeight: 800 }}>
-          {t('home.pewpew.about.close')}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
-}
-
-const preferenceControlSx = (theme: Theme) => ({
-  p: 0.35,
-  borderRadius: 2.5,
-  bgcolor:
-    theme.palette.mode === 'light'
-      ? alpha(theme.palette.common.white, 0.74)
-      : alpha(theme.palette.common.white, 0.06),
-  border: `1px solid ${
-    theme.palette.mode === 'light'
-      ? alpha(theme.palette.grey[900], 0.12)
-      : alpha(theme.palette.common.white, 0.1)
-  }`,
-  '& .MuiToggleButton-root': {
-    minHeight: 38,
-    textTransform: 'none',
-    fontWeight: 800,
-    px: 1,
-    whiteSpace: 'normal',
-    lineHeight: 1.2,
-    border: 0,
-    borderRadius: '10px !important',
-    color: theme.palette.text.secondary,
-    '&.Mui-selected': {
-      bgcolor:
-        theme.palette.mode === 'light'
-          ? alpha(PEWPEW_BLUE, 0.12)
-          : alpha(PEWPEW_BLUE, 0.28),
-      color: theme.palette.mode === 'light' ? PEWPEW_BLUE : '#dbeafe',
-    },
-    '&.Mui-selected:hover': {
-      bgcolor:
-        theme.palette.mode === 'light'
-          ? alpha(PEWPEW_BLUE, 0.16)
-          : alpha(PEWPEW_BLUE, 0.34),
-    },
-  },
-})
-
-const PreferenceSection = ({
-  title,
-  children,
-}: {
-  title: string
-  children: ReactNode
-}) => {
-  return (
-    <Stack spacing={1}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>
-        {title}
-      </Typography>
-      {children}
-    </Stack>
-  )
-}
-
-const PreferenceSwitch = ({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string
-  checked: boolean
-  disabled: boolean
-  onChange: (checked: boolean) => void
-}) => {
-  return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) auto',
-        gap: 2,
-        alignItems: 'center',
-        minHeight: 42,
-        minWidth: 0,
-      }}
-    >
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 650,
-          minWidth: 0,
-          overflowWrap: 'anywhere',
-        }}
-      >
-        {label}
-      </Typography>
-      <Switch
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        sx={pewpewSwitchSx}
-      />
-    </Box>
-  )
-}
-
-const pewpewSwitchSx = {
-  width: 48,
-  height: 30,
-  p: 0.75,
-  flexShrink: 0,
-  '& .MuiSwitch-switchBase': {
-    p: 0.75,
-    transitionDuration: '220ms',
-    '&.Mui-checked': {
-      transform: 'translateX(18px)',
-      color: '#fff',
-      '& + .MuiSwitch-track': {
-        bgcolor: '#2f7dff',
-        opacity: 1,
-      },
-      '& .MuiSwitch-thumb': {
-        borderColor: 'rgba(255,255,255,0.72)',
-      },
-    },
-    '&.Mui-disabled': {
-      color: '#9ca3af',
-      '& + .MuiSwitch-track': {
-        opacity: 1,
-        bgcolor: (theme: Theme) =>
-          theme.palette.mode === 'light' ? '#e5e7eb' : 'rgba(255,255,255,0.12)',
-      },
-      '& .MuiSwitch-thumb': {
-        borderColor: 'rgba(148,163,184,0.45)',
-      },
-    },
-  },
-  '& .MuiSwitch-thumb': {
-    width: 18,
-    height: 18,
-    bgcolor: '#fff',
-    border: '1px solid rgba(15,23,42,0.25)',
-    boxShadow: '0 2px 8px rgba(15,23,42,0.18)',
-  },
-  '& .MuiSwitch-track': {
-    borderRadius: 999,
-    opacity: 1,
-    bgcolor: (theme: Theme) =>
-      theme.palette.mode === 'light' ? '#cbd5e1' : 'rgba(255,255,255,0.22)',
-  },
-}
-
-const AboutDialog = ({
-  open,
-  onClose,
-  onCopyDiagnostics,
-}: {
-  open: boolean
-  onClose: () => void
-  onCopyDiagnostics: () => Promise<void>
-}) => {
-  const { t } = useTranslation()
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      slotProps={{
-        paper: {
-          sx: {
-            borderRadius: 4,
-            transition:
-              'background-color 280ms ease, color 240ms ease, border-color 280ms ease, box-shadow 280ms ease',
-          },
-        },
-      }}
-    >
-      <DialogTitle sx={{ pr: 6, fontWeight: 850 }}>
-        {t('home.pewpew.about.title')}
-        <IconButton
-          aria-label={t('home.pewpew.about.close')}
-          onClick={onClose}
-          sx={{ position: 'absolute', right: 12, top: 10 }}
-        >
-          <CloseRounded />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent dividers>
-        <Stack spacing={2}>
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.5 }}>
-              {t('home.pewpew.about.clientName')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('home.pewpew.about.description')}
-            </Typography>
-          </Box>
-
-          <Divider />
-
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.5 }}>
-              {t('home.pewpew.about.licenseTitle')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('home.pewpew.about.license')}
-            </Typography>
-          </Box>
-
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.5 }}>
-              {t('home.pewpew.about.credits')}
-            </Typography>
-            <Stack spacing={0.5}>
-              <Link
-                href="https://github.com/clash-verge-rev/clash-verge-rev"
-                target="_blank"
-                rel="noreferrer"
-                underline="hover"
-              >
-                Clash Verge Rev
-              </Link>
-              <Link
-                href="https://github.com/MetaCubeX/mihomo"
-                target="_blank"
-                rel="noreferrer"
-                underline="hover"
-              >
-                mihomo / Clash.Meta
-              </Link>
-              <Link
-                href="https://tauri.app/"
-                target="_blank"
-                rel="noreferrer"
-                underline="hover"
-              >
-                Tauri
-              </Link>
-            </Stack>
-          </Box>
-
-          <Typography variant="caption" color="text.secondary">
-            {t('home.pewpew.about.support')}
-          </Typography>
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button
-          onClick={() => void onCopyDiagnostics()}
-          startIcon={<ContentCopyRounded />}
-          sx={{ borderRadius: 999, fontWeight: 800, mr: 'auto' }}
-        >
-          {t('home.pewpew.diagnostics.copy')}
-        </Button>
-        <Button onClick={onClose} sx={{ borderRadius: 999, fontWeight: 800 }}>
-          {t('home.pewpew.about.close')}
-        </Button>
-      </DialogActions>
-    </Dialog>
   )
 }
 

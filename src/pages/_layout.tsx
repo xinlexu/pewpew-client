@@ -262,8 +262,8 @@ const Layout = () => {
 
   return (
     <ThemeProvider theme={theme}>
-      {/* 左侧底部窗口控制按钮 */}
-      <NoticeManager position={verge?.notice_position} />
+      {/* PewPew 固定把通知放在右下角，避免遮挡顶部按钮（简化版没有位置设置） */}
+      <NoticeManager position="bottom-right" />
       <div
         style={{
           animation: 'fadeIn 0.5s',

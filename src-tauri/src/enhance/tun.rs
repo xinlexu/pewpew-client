@@ -1,8 +1,5 @@
 use serde_yaml_ng::{Mapping, Value};
 
-#[cfg(target_os = "macos")]
-use crate::process::AsyncHandler;
-
 macro_rules! revise {
     ($map: expr, $key: expr, $val: expr) => {
         let ret_key = Value::String($key.into());
@@ -56,24 +53,10 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
             if !dns_val.contains_key(Value::from("fake-ip-range")) {
                 revise!(dns_val, "fake-ip-range", "198.18.0.1/16");
             }
-
-            #[cfg(target_os = "macos")]
-            {
-                AsyncHandler::spawn(move || async move {
-                    crate::utils::resolve::dns::restore_public_dns().await;
-                    crate::utils::resolve::dns::set_public_dns("114.114.114.114".to_string()).await;
-                });
-            }
         }
 
         // 当TUN启用时，将修改后的DNS配置写回
         revise!(config, "dns", dns_val);
-    } else {
-        // TUN未启用时，仅恢复系统DNS，不修改配置文件中的DNS设置
-        #[cfg(target_os = "macos")]
-        AsyncHandler::spawn(move || async move {
-            crate::utils::resolve::dns::restore_public_dns().await;
-        });
     }
 
     // 更新TUN配置
@@ -81,4 +64,38 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
     revise!(config, "tun", tun_val);
 
     config
+}
+
+#[cfg(test)]
+mod tests {
+    use super::use_tun;
+    use serde_yaml_ng::Mapping;
+
+    #[test]
+    fn enabling_tun_preserves_routing_mode_and_custom_dns() -> anyhow::Result<()> {
+        let config: Mapping = serde_yaml_ng::from_str(
+            "mode: rule\ndns:\n  enhanced-mode: redir-host\n  nameserver: [https://example.test/dns-query]\ntun:\n  auto-route: true\n",
+        )?;
+        let dns = config.get("dns").cloned();
+        let enhanced = use_tun(config, true);
+        assert_eq!(enhanced.get("mode").and_then(|v| v.as_str()), Some("rule"));
+        assert_eq!(enhanced.get("dns").cloned(), dns);
+        assert_eq!(
+            enhanced
+                .get("tun")
+                .and_then(|v| v.get("enable"))
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        let disconnected = use_tun(enhanced, false);
+        assert_eq!(disconnected.get("dns").cloned(), dns);
+        assert_eq!(
+            disconnected
+                .get("tun")
+                .and_then(|v| v.get("enable"))
+                .and_then(|v| v.as_bool()),
+            Some(false)
+        );
+        Ok(())
+    }
 }

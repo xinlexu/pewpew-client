@@ -1,26 +1,42 @@
 import {
-  RefreshRounded,
+  SpeedRounded,
   SignalWifi0Bar as SignalNone,
   SignalWifi4Bar as SignalStrong,
 } from '@mui/icons-material'
 import {
   Box,
   Chip,
+  CircularProgress,
   FormControl,
   IconButton,
   MenuItem,
   Select,
   SelectChangeEvent,
+  Skeleton,
   Stack,
   Typography,
   Tooltip,
   alpha,
   useTheme,
 } from '@mui/material'
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { EnhancedCard } from '@/components/home/enhanced-card'
+import {
+  glassFieldSx,
+  glassMenuPaperSx,
+  isLightTheme,
+  sectionLabelSx,
+  toneTextColor,
+} from '@/components/home/pewpew-ui'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import {
@@ -38,6 +54,9 @@ import {
 
 interface CurrentProxyCardProps {
   embedded?: boolean
+  disabled?: boolean
+  // Profiles or route data are still loading; show a placeholder.
+  loading?: boolean
   routeBlocked?: boolean
   routeBlockedText?: string
   onDelayUpdated?: () => void
@@ -80,6 +99,8 @@ const formatLineDelay = (
 
 export const CurrentProxyCard = ({
   embedded = false,
+  disabled = false,
+  loading = false,
   routeBlocked = false,
   routeBlockedText,
   onDelayUpdated,
@@ -93,6 +114,7 @@ export const CurrentProxyCard = ({
   const { current: currentProfile } = useProfiles()
   const lastDelayCheckAtRef = useRef<Record<string, number>>({})
   const [, forceDelayRender] = useReducer((value: number) => value + 1, 0)
+  const [testing, setTesting] = useState(false)
 
   const { group, options, currentName } = useMemo(
     () => resolvePewPewProxyGroup(proxies, clashConfig?.mode),
@@ -145,6 +167,7 @@ export const CurrentProxyCard = ({
       if (names.length === 0) return
 
       lastDelayCheckAtRef.current[groupName] = now
+      setTesting(true)
 
       try {
         const delayTask = delayManager.checkListDelay(
@@ -157,6 +180,8 @@ export const CurrentProxyCard = ({
         await delayTask
       } catch (error) {
         console.error('[PewPew] 线路延迟测试失败:', error)
+      } finally {
+        setTesting(false)
       }
     },
     [groupName, options, routeBlocked],
@@ -175,129 +200,211 @@ export const CurrentProxyCard = ({
     }
   }, [groupName, onDelayUpdated])
 
+  const selectSx = {
+    ...glassFieldSx(theme),
+    height: 46,
+    '& .MuiSelect-select': {
+      display: 'flex',
+      alignItems: 'center',
+      minWidth: 0,
+    },
+  }
+
+  const delayChipSx = {
+    flexShrink: 0,
+    height: 22,
+    fontWeight: 700,
+    bgcolor: isLightTheme(theme)
+      ? alpha('#ffffff', 0.7)
+      : alpha('#ffffff', 0.04),
+    // Palette greens and ambers are too light for small text on white glass.
+    ...(isLightTheme(theme) && {
+      '&.MuiChip-colorSuccess': {
+        color: '#0b7a50',
+        borderColor: alpha('#0b7a50', 0.45),
+      },
+      '&.MuiChip-colorWarning': {
+        color: toneTextColor(theme, 'warning'),
+        borderColor: alpha(toneTextColor(theme, 'warning'), 0.45),
+      },
+      '&.MuiChip-colorError': {
+        color: toneTextColor(theme, 'error'),
+        borderColor: alpha(toneTextColor(theme, 'error'), 0.45),
+      },
+    }),
+  }
+
+  const selectedDelay = currentLine
+    ? formatLineDelay(currentLine, groupName, t)
+    : null
+
   const content = (
-    <Stack spacing={1} sx={{ minWidth: 0 }}>
-      <Stack spacing={0.25}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 850 }}>
+    <Stack spacing={0.75} sx={{ minWidth: 0 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          minHeight: 22,
+        }}
+      >
+        <Typography variant="body2" sx={sectionLabelSx}>
           {t('home.pewpew.connection.route')}
         </Typography>
+        {!routeBlocked && group && options.length > 0 && (
+          <Tooltip title={t('home.pewpew.delay.refresh')}>
+            <span>
+              <IconButton
+                size="small"
+                onClick={() => void checkVisibleLineDelay(true)}
+                aria-label={t('home.pewpew.delay.refresh')}
+                disabled={testing || disabled}
+                sx={{ width: 28, height: 28, color: 'text.secondary' }}
+              >
+                {testing ? (
+                  <CircularProgress size={14} thickness={5} />
+                ) : (
+                  <SpeedRounded sx={{ fontSize: 18 }} />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
       </Stack>
 
-      {!currentProfile ? (
-        <Box sx={{ textAlign: 'center', py: 2.25 }}>
-          <Typography variant="body1" color="text.secondary">
-            {t('home.pewpew.connection.importFirst')}
-          </Typography>
-        </Box>
-      ) : isCoreDataPending ? (
-        <Box sx={{ py: 2.25 }} />
+      {loading ? (
+        <Skeleton
+          variant="rounded"
+          height={46}
+          sx={{ borderRadius: '14px' }}
+          aria-label={t('home.pewpew.connectionStatus.loading')}
+        />
+      ) : !currentProfile ? (
+        <Typography variant="body2" color="text.secondary" sx={{ py: 1.25 }}>
+          {t('home.pewpew.connection.importFirst')}
+        </Typography>
+      ) : isCoreDataPending && options.length === 0 ? (
+        <Skeleton
+          variant="rounded"
+          height={46}
+          sx={{ borderRadius: '14px' }}
+          aria-label={t('home.pewpew.connectionStatus.loading')}
+        />
       ) : routeBlocked ? (
-        <Stack direction="row" spacing={0.85} sx={{ alignItems: 'center' }}>
-          <FormControl fullWidth size="small">
-            <Select
-              value=""
-              disabled
-              displayEmpty
-              renderValue={() => (
-                <Typography component="span" color="error.main">
-                  {routeBlockedText || t('home.pewpew.connection.selectRoute')}
-                </Typography>
-              )}
-              sx={{
-                height: 42,
-                borderRadius: 2.5,
-                bgcolor: alpha(theme.palette.background.paper, 0.72),
-              }}
-            />
-          </FormControl>
-        </Stack>
+        <FormControl fullWidth size="small">
+          <Select
+            value=""
+            disabled
+            displayEmpty
+            renderValue={() => (
+              <Typography
+                component="span"
+                noWrap
+                sx={{
+                  color: toneTextColor(theme, 'error'),
+                  // Disabled inputs force a grey text fill; keep the warning red.
+                  WebkitTextFillColor: toneTextColor(theme, 'error'),
+                  fontWeight: 600,
+                }}
+              >
+                {routeBlockedText || t('home.pewpew.connection.selectRoute')}
+              </Typography>
+            )}
+            sx={selectSx}
+          />
+        </FormControl>
       ) : !group || options.length === 0 ? (
-        <Box sx={{ textAlign: 'center', py: 2.25 }}>
-          <Typography variant="body1" color="text.secondary">
-            {currentProfile
-              ? t('home.pewpew.connection.noAvailableRoutes')
-              : t('home.pewpew.connection.importFirst')}
-          </Typography>
-        </Box>
+        <Typography
+          variant="body2"
+          sx={{ py: 1.25, color: toneTextColor(theme, 'warning') }}
+        >
+          {t('home.pewpew.connection.noAvailableRoutes')}
+        </Typography>
       ) : (
-        <Stack direction="row" spacing={0.85} sx={{ alignItems: 'center' }}>
-          <FormControl fullWidth size="small">
-            <Select
-              value={selectedValue}
-              onChange={handleLineChange}
-              onOpen={() => void checkVisibleLineDelay(false)}
-              displayEmpty
-              renderValue={(selected) =>
-                selected ? (
-                  selected
-                ) : (
-                  <Typography component="span" color="text.secondary">
-                    {t('home.pewpew.connection.selectRoute')}
-                  </Typography>
-                )
-              }
-              sx={{
-                height: 42,
-                borderRadius: 2.5,
-                bgcolor: alpha(theme.palette.background.paper, 0.72),
-              }}
-              MenuProps={{
-                slotProps: {
-                  paper: {
-                    sx: {
-                      maxHeight: 320,
-                    },
-                  },
-                },
-              }}
-            >
-              {options.map((proxy) => {
-                const delay = formatLineDelay(proxy, groupName, t)
-                return (
-                  <MenuItem
-                    key={proxy.name}
-                    value={proxy.name}
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: 1,
-                      minHeight: 40,
-                      maxWidth: '100%',
-                    }}
+        <FormControl fullWidth size="small">
+          <Select
+            value={selectedValue}
+            onChange={handleLineChange}
+            onOpen={() => void checkVisibleLineDelay(false)}
+            disabled={disabled}
+            displayEmpty
+            inputProps={{ 'aria-label': t('home.pewpew.connection.route') }}
+            renderValue={(selected) =>
+              selected ? (
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ alignItems: 'center', minWidth: 0, width: '100%' }}
+                >
+                  <Typography
+                    component="span"
+                    noWrap
+                    sx={{ minWidth: 0, flex: 1, fontWeight: 600 }}
                   >
-                    <Typography noWrap sx={{ minWidth: 0, flex: 1 }}>
-                      {proxy.name}
-                    </Typography>
-                    {delay && (
-                      <Chip
-                        size="small"
-                        label={delay.label}
-                        color={delay.color}
-                        sx={{ flexShrink: 0 }}
-                      />
-                    )}
-                  </MenuItem>
-                )
-              })}
-            </Select>
-          </FormControl>
-          <Tooltip title={t('home.pewpew.delay.refresh')}>
-            <IconButton
-              size="small"
-              onClick={() => void checkVisibleLineDelay(true)}
-              aria-label={t('home.pewpew.delay.refresh')}
-              sx={(theme) => ({
-                width: 34,
-                height: 34,
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-                bgcolor: alpha(theme.palette.primary.main, 0.04),
-              })}
-            >
-              <RefreshRounded sx={{ fontSize: 18 }} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+                    {selected}
+                  </Typography>
+                  {selectedDelay && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={selectedDelay.label}
+                      color={selectedDelay.color}
+                      sx={delayChipSx}
+                    />
+                  )}
+                </Stack>
+              ) : (
+                <Typography
+                  component="span"
+                  noWrap
+                  sx={{ color: toneTextColor(theme, 'warning') }}
+                >
+                  {t('home.pewpew.connection.selectRoute')}
+                </Typography>
+              )
+            }
+            sx={selectSx}
+            MenuProps={{
+              slotProps: {
+                paper: {
+                  sx: [glassMenuPaperSx, { maxHeight: 340 }],
+                },
+              },
+            }}
+          >
+            {options.map((proxy) => {
+              const delay = formatLineDelay(proxy, groupName, t)
+              return (
+                <MenuItem
+                  key={proxy.name}
+                  value={proxy.name}
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 1,
+                    minHeight: 40,
+                    maxWidth: '100%',
+                  }}
+                >
+                  <Typography noWrap sx={{ minWidth: 0, flex: 1 }}>
+                    {proxy.name}
+                  </Typography>
+                  {delay && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={delay.label}
+                      color={delay.color}
+                      sx={delayChipSx}
+                    />
+                  )}
+                </MenuItem>
+              )
+            })}
+          </Select>
+        </FormControl>
       )}
     </Stack>
   )

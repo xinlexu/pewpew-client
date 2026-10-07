@@ -181,13 +181,14 @@ export interface TranslationResources {
           licenseTitle: string
           support: string
           title: string
+          version: string
         }
         account: {
-          dataExhausted: string
+          contactSupport: string
           dataExhaustedContinue: string
           dataExhaustedShort: string
+          daysLeft: string
           expire: string
-          expired: string
           expiringSoon: string
           lifetime: string
           lowData: string
@@ -195,39 +196,85 @@ export interface TranslationResources {
           planExpiredContinue: string
           planExpiredShort: string
           remainingTraffic: string
+          renewHint: string
           title: string
           unavailable: string
+          usage: string
+          usedOfTotal: string
+        }
+        compatibility: {
+          active: string
+          allow: string
+          changeFailed: string
+          check: string
+          checkFailed: string
+          checking: string
+          core: string
+          enhanced: string
+          enhancedHint: string
+          inactive: string
+          incomplete: string
+          mode: string
+          notTested: string
+          permissionBody: string
+          permissionTitle: string
+          rollbackFailed: string
+          service: string
+          serviceConflict: string
+          serviceUnavailable: string
+          standard: string
+          standardHint: string
+          summaryCoreDown: string
+          summaryDisconnected: string
+          summaryEnhancedActive: string
+          summaryEnhancedMissing: string
+          summaryStandardActive: string
+          supported: string
+          switching: string
+          switchToEnhanced: string
+          systemProxy: string
+          udp: string
+          udpUnsupported: string
+          unknown: string
+          unsupported: string
+          voice: string
         }
         connection: {
+          directMode: string
+          directModeActive: string
+          directModeBeforeConnect: string
+          directModeHint: string
           globalMode: string
           globalModeDescription: string
           importFirst: string
           mode: string
+          modeChangeFailed: string
           noAvailableRoutes: string
-          recommended: string
-          recommendedShort: string
           route: string
           routeChangeFailed: string
           selectRoute: string
           smartMode: string
           smartModeDescription: string
-          title: string
         }
         connectionStatus: {
           connect: string
           connected: string
           connectFailed: string
           connecting: string
+          coreUnavailable: string
           disconnect: string
           disconnected: string
           disconnectFailed: string
           disconnecting: string
           failed: string
+          loading: string
           reconnect: string
           repairFailed: string
           repairNetwork: string
           repairSuccess: string
           title: string
+          updatingRoutes: string
+          verificationFailed: string
         }
         delay: {
           refresh: string
@@ -242,13 +289,15 @@ export interface TranslationResources {
         }
         header: {
           about: string
+          copyWechat: string
           preferences: string
           subtitle: string
           title: string
           wechat: string
+          wechatCopied: string
         }
         onboarding: {
-          importRoutes: string
+          description: string
           stepConnect: string
           stepImport: string
           stepPaste: string
@@ -256,25 +305,30 @@ export interface TranslationResources {
         }
         preferences: {
           appearance: string
-          autoCloseOnQuit: string
+          autoCloseConnections: string
+          autoCloseConnectionsHint: string
           autoLaunch: string
-          autoStartPewPew: string
           autoUpdateRoutesOnStartup: string
+          connection: string
           dark: string
-          english: string
           followSystem: string
           language: string
           light: string
-          safety: string
+          restoreHint: string
           saveFailed: string
           silentStart: string
-          simplifiedChinese: string
           startup: string
           title: string
         }
+        route: {
+          autoSelected: string
+          invalidWhileConnected: string
+          noneSelected: string
+          switchedToSmart: string
+        }
         subscription: {
           autoUpdateFailed: string
-          description: string
+          changeLink: string
           dropYaml: string
           import: string
           imported: string
@@ -286,7 +340,6 @@ export interface TranslationResources {
           lastUpdated: string
           localFile: string
           notImported: string
-          orImportYaml: string
           pasteFirst: string
           placeholder: string
           subscriptionLink: string
@@ -304,11 +357,6 @@ export interface TranslationResources {
           yamlSupport: string
           yamlSwitched: string
           yamlTemporarilyStopped: string
-        }
-        switch: {
-          currentRoute: string
-          currentRouteEmpty: string
-          currentRouteWithDelay: string
         }
       }
     }

@@ -1,17 +1,19 @@
 import {
+  CloudSyncOutlined,
   CloudUploadOutlined,
   ClearRounded,
   ContentPasteRounded,
   DescriptionOutlined,
+  ExpandMoreRounded,
   UpdateOutlined,
 } from '@mui/icons-material'
 import {
   Box,
   Button,
-  Divider,
+  CircularProgress,
+  Collapse,
   IconButton,
   InputAdornment,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -21,7 +23,7 @@ import { listen, TauriEvent } from '@tauri-apps/api/event'
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readTextFile } from '@tauri-apps/plugin-fs'
-import { useLockFn } from 'ahooks'
+import { useLockFn, useMemoizedFn } from 'ahooks'
 import dayjs from 'dayjs'
 import yaml from 'js-yaml'
 import {
@@ -35,7 +37,20 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
+import pewpewLogo from '@/assets/pewpew-logo.jpg'
+import {
+  brandColor,
+  glassFieldSx,
+  glassOutlinedButtonSx,
+  iconTileSx,
+  isLightTheme,
+  pillButtonSx,
+  surfaceSx,
+} from '@/components/home/pewpew-ui'
+import {
+  refreshConnectionState,
+  useConnectionState,
+} from '@/hooks/use-connection-state'
 import {
   useAppRefreshers,
   useClashConfigData,
@@ -66,6 +81,8 @@ interface HomeProfileCardProps {
   onProfileUpdated?: () => void | Promise<void>
   onSyncingChange?: (syncing: boolean) => void
   busy?: boolean
+  // 'onboarding' shows the full import form for first-time users.
+  variant?: 'onboarding' | 'compact'
 }
 
 const isYamlPath = (value: string) => /\.ya?ml$/i.test(value)
@@ -107,17 +124,19 @@ export const HomeProfileCard = ({
   current,
   onProfileUpdated,
   onSyncingChange,
-  busy = false,
+  busy: externalBusy = false,
+  variant = 'compact',
 }: HomeProfileCardProps) => {
   const { i18n, t } = useTranslation()
   const { refreshAll } = useAppRefreshers()
   const { clashConfig } = useClashConfigData()
   const {
-    indicator: networkEnabled,
-    configState: networkConfigEnabled,
-    setSystemProxyEnabled,
-    invalidateProxyState,
-  } = useSystemProxyState()
+    enabled: networkEnabled,
+    configured: networkConfigEnabled,
+    setConnected,
+    busy: connectionBusy,
+  } = useConnectionState()
+  const busy = externalBusy || connectionBusy
   const [subscriptionUrl, setSubscriptionUrl] = useState('')
   const [statusMessage, setStatusMessage] = useState<StatusMessage>({
     type: 'empty',
@@ -125,6 +144,7 @@ export const HomeProfileCard = ({
   const [syncing, setSyncing] = useState(false)
   const syncingRef = useRef(false)
   const [dragActive, setDragActive] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const dragActiveRef = useRef(false)
   const dragDepthRef = useRef(0)
 
@@ -191,8 +211,8 @@ export const HomeProfileCard = ({
     if (!networkEnabled && !networkConfigEnabled) return false
 
     setStatusKey(messageKey)
-    await setSystemProxyEnabled(false)
-    await invalidateProxyState()
+    await setConnected(false)
+    await refreshConnectionState()
     return true
   }
 
@@ -275,6 +295,7 @@ export const HomeProfileCard = ({
         throw new Error('remote-profile-not-found')
       }
 
+      await closeNetworkBeforeSync()
       const switched = await patchProfilesConfig({
         current: createdProfile.uid,
       } as IProfilesConfig)
@@ -282,7 +303,6 @@ export const HomeProfileCard = ({
         throw new Error('profile-switch-failed')
       }
 
-      await closeNetworkBeforeSync()
       await refreshSubscription()
       setSubscriptionUrl('')
       setStatusKey('home.pewpew.subscription.importSuccess')
@@ -419,7 +439,11 @@ export const HomeProfileCard = ({
           throw new Error('no-routes')
         }
 
-        localStorage.setItem(PEWPEW_LAST_YAML_PROFILE_KEY, createdProfile.uid)
+        try {
+          localStorage.setItem(PEWPEW_LAST_YAML_PROFILE_KEY, createdProfile.uid)
+        } catch {
+          // This optional diagnostic marker must not fail an applied import.
+        }
         setStatusKeys(
           'home.pewpew.subscription.yamlSuccess',
           'home.pewpew.subscription.yamlSwitched',
@@ -476,29 +500,59 @@ export const HomeProfileCard = ({
   })
 
   const handleImportYaml = useLockFn(async () => {
-    const selected = await openDialog({
-      multiple: false,
-      directory: false,
-      filters: [
-        {
-          name: 'YAML',
-          extensions: ['yaml', 'yml'],
-        },
-      ],
-    })
-    const filePath = Array.isArray(selected) ? selected[0] : selected
-    if (!filePath) return
+    if (busy || syncingRef.current) return
+    try {
+      const selected = await openDialog({
+        multiple: false,
+        directory: false,
+        filters: [
+          {
+            name: 'YAML',
+            extensions: ['yaml', 'yml'],
+          },
+        ],
+      })
+      const filePath = Array.isArray(selected) ? selected[0] : selected
+      if (!filePath) return
 
-    if (typeof filePath !== 'string') {
+      if (typeof filePath !== 'string') {
+        setStatusKey('home.pewpew.subscription.yamlFailed')
+        showNotice.error(t('home.pewpew.subscription.yamlFailed'))
+        return
+      }
+
+      await importYamlFileFromPath(filePath, 'dialog')
+    } catch {
       setStatusKey('home.pewpew.subscription.yamlFailed')
       showNotice.error(t('home.pewpew.subscription.yamlFailed'))
-      return
     }
-
-    await importYamlFileFromPath(filePath, 'dialog')
   })
 
   const canImport = subscriptionUrl.trim().length > 0
+
+  // Stable wrappers keep the native drag listeners registered once instead of
+  // re-subscribing on every render (each keystroke used to cost 6 IPC calls).
+  const handleNativeDragEnter = useMemoizedFn((paths?: string[]) => {
+    if (paths?.some(isYamlPath)) setYamlDragActive(true)
+  })
+
+  const handleNativeDrop = useMemoizedFn((paths?: string[]) => {
+    if (syncingRef.current || !dragActiveRef.current) return
+    const firstYaml = paths?.find(isYamlPath)
+    if (firstYaml) {
+      void importYamlFileFromPath(firstYaml, 'drop')
+    } else {
+      setStatusKey('home.pewpew.subscription.yamlOnly')
+      showNotice.error(t('home.pewpew.subscription.yamlOnly'))
+    }
+    dragDepthRef.current = 0
+    setYamlDragActive(false)
+  })
+
+  const handleNativeDragLeave = useMemoizedFn(() => {
+    dragDepthRef.current = 0
+    setYamlDragActive(false)
+  })
 
   useEffect(() => {
     let disposed = false
@@ -507,34 +561,22 @@ export const HomeProfileCard = ({
     const setup = async () => {
       const unlistenEnter = await listen<{ paths?: string[] }>(
         TauriEvent.DRAG_ENTER,
-        (event) => {
-          const hasYaml = event.payload.paths?.some(isYamlPath)
-          if (hasYaml) setYamlDragActive(true)
-        },
+        (event) => handleNativeDragEnter(event.payload.paths),
       )
       cleanups.push(unlistenEnter)
 
       const unlistenDrop = await listen<{ paths?: string[] }>(
         TauriEvent.DRAG_DROP,
         (event) => {
-          if (disposed || syncingRef.current || !dragActiveRef.current) return
-          const firstYaml = event.payload.paths?.find(isYamlPath)
-          if (firstYaml) {
-            void importYamlFileFromPath(firstYaml, 'drop')
-          } else {
-            setStatusKey('home.pewpew.subscription.yamlOnly')
-            showNotice.error(t('home.pewpew.subscription.yamlOnly'))
-          }
-          dragDepthRef.current = 0
-          setYamlDragActive(false)
+          if (disposed) return
+          handleNativeDrop(event.payload.paths)
         },
       )
       cleanups.push(unlistenDrop)
 
-      const unlistenLeave = await listen(TauriEvent.DRAG_LEAVE, () => {
-        dragDepthRef.current = 0
-        setYamlDragActive(false)
-      })
+      const unlistenLeave = await listen(TauriEvent.DRAG_LEAVE, () =>
+        handleNativeDragLeave(),
+      )
       cleanups.push(unlistenLeave)
     }
 
@@ -550,7 +592,7 @@ export const HomeProfileCard = ({
       disposed = true
       cleanups.forEach((cleanup) => cleanup())
     }
-  }, [importYamlFileFromPath, t])
+  }, [handleNativeDragEnter, handleNativeDrop, handleNativeDragLeave])
 
   const handleDragEnter = (event: DragEvent<HTMLElement>) => {
     event.preventDefault()
@@ -598,48 +640,21 @@ export const HomeProfileCard = ({
     showNotice.error(t('home.pewpew.subscription.yamlOnly'))
   }
 
-  return (
-    <Paper
-      className="pewpew-transition"
-      elevation={0}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      sx={(theme) => ({
-        borderRadius: 4,
-        p: { xs: 2, md: 2.5 },
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        bgcolor: 'var(--pewpew-panel-muted)',
-        border: `1px solid ${
-          dragActive
-            ? alpha(theme.palette.primary.main, 0.48)
-            : alpha(theme.palette.primary.main, 0.08)
-        }`,
-        boxShadow: dragActive
-          ? `0 18px 44px ${alpha(theme.palette.primary.main, 0.16)}`
-          : theme.palette.mode === 'light'
-            ? '0 12px 34px rgba(40, 70, 120, 0.06)'
-            : '0 12px 34px rgba(0, 0, 0, 0.18)',
-      })}
-    >
-      <Stack spacing={1.5}>
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{ alignItems: 'center', justifyContent: 'space-between' }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h6" sx={{ fontWeight: 850 }}>
-              {t('home.pewpew.subscription.title')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('home.pewpew.subscription.description')}
-            </Typography>
-          </Box>
-        </Stack>
+  const isOnboarding = variant === 'onboarding'
+  const isRemote = current?.type === 'remote'
+  const showImportForm = isOnboarding || expanded || dragActive || !current
+  const statusLine = statusText || currentStatus
 
+  const dragHandlers = {
+    onDragEnter: handleDragEnter,
+    onDragLeave: handleDragLeave,
+    onDragOver: handleDragOver,
+    onDrop: handleDrop,
+  }
+
+  const importForm = (
+    <Stack spacing={1.25}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
         <TextField
           fullWidth
           size="small"
@@ -647,10 +662,29 @@ export const HomeProfileCard = ({
           value={subscriptionUrl}
           onChange={(event) => setSubscriptionUrl(event.target.value)}
           onPaste={handleSubscriptionPaste}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && canImport) void handleImport()
+          }}
           slotProps={{
+            htmlInput: {
+              'aria-label': t('home.pewpew.subscription.subscriptionLink'),
+              spellCheck: false,
+            },
             input: {
               endAdornment: (
                 <InputAdornment position="end">
+                  {subscriptionUrl && (
+                    <IconButton
+                      size="small"
+                      title={t('shared.actions.clear')}
+                      aria-label={t('shared.actions.clear')}
+                      disabled={syncing || busy}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => setSubscriptionUrl('')}
+                    >
+                      <ClearRounded fontSize="inherit" />
+                    </IconButton>
+                  )}
                   <IconButton
                     size="small"
                     edge="end"
@@ -664,116 +698,320 @@ export const HomeProfileCard = ({
                   >
                     <ContentPasteRounded fontSize="inherit" />
                   </IconButton>
-                  {subscriptionUrl && (
-                    <IconButton
-                      size="small"
-                      edge="end"
-                      title={t('shared.actions.clear')}
-                      aria-label={t('shared.actions.clear')}
-                      disabled={syncing || busy}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => setSubscriptionUrl('')}
-                    >
-                      <ClearRounded fontSize="inherit" />
-                    </IconButton>
-                  )}
                 </InputAdornment>
               ),
             },
           }}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              borderRadius: 2.5,
-              bgcolor: 'var(--pewpew-input-bg)',
-            },
-          }}
-        />
-
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-          <Button
-            fullWidth
-            variant="contained"
-            onClick={handleImport}
-            disabled={!canImport || syncing || busy}
-            startIcon={<CloudUploadOutlined />}
-            sx={{ borderRadius: 999, py: 1 }}
-          >
-            {t('home.pewpew.subscription.import')}
-          </Button>
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={handleUpdate}
-            disabled={current?.type !== 'remote' || syncing || busy}
-            startIcon={<UpdateOutlined />}
-            sx={{ borderRadius: 999, py: 1 }}
-          >
-            {t('home.pewpew.subscription.update')}
-          </Button>
-        </Stack>
-
-        <Divider />
-
-        <Box
           sx={(theme) => ({
-            borderRadius: 3,
-            border: `1px dashed ${
-              dragActive
-                ? theme.palette.primary.main
-                : alpha(theme.palette.primary.main, 0.22)
-            }`,
-            bgcolor: dragActive
-              ? alpha(theme.palette.primary.main, 0.1)
-              : alpha(theme.palette.primary.main, 0.035),
-            p: 1.35,
-            transition: 'background-color 180ms ease, border-color 180ms ease',
+            '& .MuiOutlinedInput-root': {
+              ...glassFieldSx(theme),
+              minHeight: 44,
+            },
           })}
+        />
+        <Button
+          variant="contained"
+          onClick={handleImport}
+          disabled={!canImport || syncing || busy}
+          startIcon={
+            syncing ? (
+              <CircularProgress size={16} color="inherit" thickness={5} />
+            ) : (
+              <CloudUploadOutlined />
+            )
+          }
+          sx={{
+            ...pillButtonSx,
+            flexShrink: 0,
+            minWidth: 132,
+            minHeight: 44,
+            px: 2.5,
+          }}
+        >
+          {t('home.pewpew.subscription.import')}
+        </Button>
+      </Stack>
+
+      <Box
+        sx={(theme) => {
+          const brand = brandColor(theme)
+          return {
+            borderRadius: '16px',
+            border: `1.5px dashed ${dragActive ? brand : alpha(brand, 0.3)}`,
+            bgcolor: dragActive
+              ? alpha(brand, 0.1)
+              : isLightTheme(theme)
+                ? alpha('#ffffff', 0.45)
+                : alpha('#ffffff', 0.03),
+            px: 1.5,
+            py: 1.25,
+            transition: 'background-color 180ms ease, border-color 180ms ease',
+          }
+        }}
+      >
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.25}
+          sx={{
+            alignItems: { xs: 'stretch', sm: 'center' },
+            justifyContent: 'space-between',
+          }}
         >
           <Stack
-            direction={{ xs: 'column', sm: 'row' }}
+            direction="row"
             spacing={1.25}
-            sx={{
-              alignItems: { xs: 'stretch', sm: 'center' },
-              justifyContent: 'space-between',
-            }}
+            sx={{ alignItems: 'center', minWidth: 0 }}
           >
+            <DescriptionOutlined
+              sx={(theme) => ({ color: brandColor(theme), flexShrink: 0 })}
+            />
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>
-                {t('home.pewpew.subscription.localFile')}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
                 {dragActive
                   ? t('home.pewpew.subscription.dropYaml')
-                  : t('home.pewpew.subscription.yamlSupport')}
+                  : t('home.pewpew.subscription.localFile')}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {t('home.pewpew.subscription.orImportYaml')}
+                {t('home.pewpew.subscription.yamlSupport')}
               </Typography>
             </Box>
+          </Stack>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleImportYaml}
+            disabled={syncing || busy}
+            startIcon={<DescriptionOutlined />}
+            sx={[glassOutlinedButtonSx, { flexShrink: 0, px: 2 }]}
+          >
+            {t('home.pewpew.subscription.importYaml')}
+          </Button>
+        </Stack>
+      </Box>
+    </Stack>
+  )
+
+  if (isOnboarding) {
+    const steps = [
+      t('home.pewpew.onboarding.stepPaste'),
+      t('home.pewpew.onboarding.stepImport'),
+      t('home.pewpew.onboarding.stepConnect'),
+    ]
+
+    return (
+      <Box
+        component="section"
+        aria-labelledby="pewpew-onboarding-title"
+        {...dragHandlers}
+        sx={[
+          surfaceSx('primary'),
+          { px: { xs: 2, sm: 3 }, py: { xs: 2.5, sm: 3 } },
+        ]}
+      >
+        <Stack spacing={2.5}>
+          <Stack
+            spacing={1.5}
+            sx={{
+              alignItems: 'center',
+              textAlign: 'center',
+              pt: { xs: 0.5, sm: 1 },
+            }}
+          >
+            <Box
+              component="img"
+              src={pewpewLogo}
+              alt=""
+              sx={(theme) => ({
+                width: 64,
+                height: 64,
+                borderRadius: '20px',
+                objectFit: 'cover',
+                boxShadow: isLightTheme(theme)
+                  ? '0 14px 30px rgba(36, 87, 214, 0.3) !important'
+                  : '0 14px 30px rgba(0, 0, 0, 0.45) !important',
+              })}
+            />
+            <Box>
+              <Typography
+                id="pewpew-onboarding-title"
+                variant="h5"
+                component="h2"
+                sx={{ fontWeight: 800, fontSize: { xs: 22, sm: 26 } }}
+              >
+                {t('home.pewpew.onboarding.title')}
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.75 }}
+              >
+                {t('home.pewpew.onboarding.description')}
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Stack
+            component="ol"
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            sx={{
+              m: 0,
+              p: 0,
+              listStyle: 'none',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            {steps.map((step, index) => (
+              <Stack
+                key={step}
+                component="li"
+                direction="row"
+                spacing={1}
+                sx={(theme) => ({
+                  alignItems: 'center',
+                  minWidth: 0,
+                  pl: 0.75,
+                  pr: 1.5,
+                  py: 0.6,
+                  borderRadius: 999,
+                  bgcolor: isLightTheme(theme)
+                    ? alpha('#ffffff', 0.6)
+                    : alpha('#ffffff', 0.05),
+                  border: `1px solid ${
+                    isLightTheme(theme)
+                      ? alpha('#ffffff', 0.9)
+                      : alpha('#ffffff', 0.08)
+                  }`,
+                })}
+              >
+                <Box
+                  sx={(theme) => ({
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: brandColor(theme),
+                    bgcolor: alpha(brandColor(theme), 0.12),
+                  })}
+                >
+                  {index + 1}
+                </Box>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {step}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+
+          {importForm}
+
+          {statusText && (
+            <Typography variant="body2" color="text.secondary" role="status">
+              {statusText}
+            </Typography>
+          )}
+        </Stack>
+      </Box>
+    )
+  }
+
+  return (
+    <Box
+      component="section"
+      aria-labelledby="pewpew-subscription-title"
+      {...dragHandlers}
+      sx={[surfaceSx('secondary'), { px: { xs: 2, sm: 2.5 }, py: 2 }]}
+    >
+      <Stack spacing={showImportForm ? 1.75 : 0}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+          sx={{
+            alignItems: { xs: 'stretch', sm: 'center' },
+            justifyContent: 'space-between',
+          }}
+        >
+          <Stack
+            direction="row"
+            spacing={1.25}
+            sx={{ alignItems: 'center', minWidth: 0 }}
+          >
+            <Box aria-hidden sx={(theme) => iconTileSx(theme, 40)}>
+              {isRemote ? <CloudSyncOutlined /> : <DescriptionOutlined />}
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                id="pewpew-subscription-title"
+                variant="subtitle1"
+                component="h2"
+                sx={{ fontWeight: 800, lineHeight: 1.3 }}
+              >
+                {isRemote
+                  ? t('home.pewpew.subscription.title')
+                  : t('home.pewpew.subscription.localFile')}
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                role="status"
+                sx={{ overflowWrap: 'anywhere' }}
+              >
+                {statusLine}
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ flexShrink: 0, justifyContent: 'flex-end' }}
+          >
+            {isRemote && (
+              <Button
+                variant="outlined"
+                onClick={handleUpdate}
+                disabled={syncing || busy}
+                startIcon={
+                  syncing ? (
+                    <CircularProgress size={16} thickness={5} />
+                  ) : (
+                    <UpdateOutlined />
+                  )
+                }
+                sx={[glassOutlinedButtonSx, { px: 2 }]}
+              >
+                {t('home.pewpew.subscription.update')}
+              </Button>
+            )}
             <Button
-              variant="outlined"
-              onClick={handleImportYaml}
-              disabled={syncing || busy}
-              startIcon={<DescriptionOutlined />}
-              sx={{
-                borderRadius: 999,
-                py: 1,
-                px: 2,
-                fontWeight: 800,
-                flexShrink: 0,
-              }}
+              variant="text"
+              onClick={() => setExpanded((value) => !value)}
+              aria-expanded={showImportForm}
+              endIcon={
+                <ExpandMoreRounded
+                  sx={{
+                    transform: showImportForm ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 180ms ease',
+                  }}
+                />
+              }
+              sx={{ ...pillButtonSx, px: 1.5 }}
             >
-              {t('home.pewpew.subscription.importYaml')}
+              {t('home.pewpew.subscription.changeLink')}
             </Button>
           </Stack>
-        </Box>
+        </Stack>
 
-        <Box>
-          <Typography variant="body2" color="text.secondary">
-            {statusText || currentStatus}
-          </Typography>
-        </Box>
+        <Collapse in={showImportForm} timeout={200}>
+          {importForm}
+        </Collapse>
       </Stack>
-    </Paper>
+    </Box>
   )
 }

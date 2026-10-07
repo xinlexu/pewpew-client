@@ -159,6 +159,7 @@ mod app_init {
             cmd::reinstall_service,
             cmd::repair_service,
             cmd::is_service_available,
+            cmd::prepare_enhanced_connection,
             cmd::get_clash_info,
             cmd::patch_clash_config,
             cmd::patch_clash_mode,

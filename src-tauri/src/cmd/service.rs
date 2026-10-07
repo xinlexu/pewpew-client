@@ -2,6 +2,11 @@ use super::{CmdResult, StringifyErr as _};
 use crate::core::service::{self, SERVICE_MANAGER, ServiceStatus};
 use smartstring::SmartString;
 
+#[tauri::command]
+pub async fn prepare_enhanced_connection() -> CmdResult {
+    service::prepare_enhanced_connection().await.stringify_err()
+}
+
 async fn execute_service_operation_sync(status: ServiceStatus, op_type: &str) -> CmdResult {
     if let Err(e) = SERVICE_MANAGER.lock().await.handle_service_status(&status).await {
         let emsg = format!("{} Service failed: {}", op_type, e);
@@ -32,6 +37,8 @@ pub async fn repair_service() -> CmdResult {
 
 #[tauri::command]
 pub async fn is_service_available() -> CmdResult<bool> {
+    #[cfg(target_os = "windows")]
+    service::ensure_service_owned().stringify_err()?;
     service::is_service_available().await.stringify_err()?;
     Ok(true)
 }

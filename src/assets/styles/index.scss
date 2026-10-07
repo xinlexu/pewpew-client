@@ -59,3 +59,30 @@ body {
   -moz-user-select: none;
   -ms-user-select: none;
 }
+
+// Ring colors of the PewPew connect button; registering them lets the ring
+// fade between states instead of snapping.
+@property --pp-ring-a {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #38bdf8;
+}
+@property --pp-ring-b {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2457d6;
+}
+@property --pp-ring-c {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #6366f1;
+}
+
+// Keyboard focus ring for PewPew surfaces; the theme resets outlines globally.
+.pewpew-shell,
+.pewpew-dialog {
+  :focus-visible:not(input):not(textarea) {
+    outline: 2px solid var(--primary-main) !important;
+    outline-offset: 2px;
+  }
+}

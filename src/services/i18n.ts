@@ -209,6 +209,13 @@ i18n.use(initReactI18next).init({
   },
 })
 
+// Keep <html lang> in sync so the webview picks the right CJK glyphs and fonts.
+const syncDocumentLanguage = (language: string) => {
+  if (typeof document === 'undefined') return
+  document.documentElement.lang =
+    language === 'zh' ? 'zh-CN' : language === 'zhtw' ? 'zh-TW' : language
+}
+
 export const changeLanguage = async (language: string) => {
   const targetLanguage = resolveLanguage(language)
 
@@ -219,6 +226,7 @@ export const changeLanguage = async (language: string) => {
 
   await i18n.changeLanguage(targetLanguage)
   cacheLanguage(targetLanguage)
+  syncDocumentLanguage(targetLanguage)
 }
 
 export const changeClientLanguageMode = async (mode: ClientLanguageMode) => {

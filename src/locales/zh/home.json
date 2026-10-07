@@ -138,12 +138,9 @@
       "subtitle": "选择线路后，点击连接即可使用",
       "wechat": "微信 PewPew_VPN",
       "about": "关于",
-      "preferences": "偏好设置"
-    },
-    "switch": {
-      "currentRouteEmpty": "当前线路：请选择线路",
-      "currentRoute": "当前线路：{{name}}",
-      "currentRouteWithDelay": "当前线路：{{name}} · {{delay}}"
+      "preferences": "偏好设置",
+      "copyWechat": "复制客服微信号",
+      "wechatCopied": "已复制客服微信号 PewPew_VPN"
     },
     "account": {
       "title": "账户信息",
@@ -152,14 +149,54 @@
       "expire": "套餐到期",
       "unavailable": "未提供",
       "lifetime": "长期有效",
-      "planExpiredShort": "线路已过期，请续费",
-      "planExpiredContinue": "线路已过期，请续费后使用",
+      "planExpiredShort": "套餐已到期，请续费",
+      "planExpiredContinue": "套餐已到期，请续费后使用",
       "dataExhaustedShort": "流量已用尽，请续费",
       "dataExhaustedContinue": "流量已用尽，请续费后使用",
       "expiringSoon": "套餐即将到期，请及时续费",
-      "expired": "套餐已到期，请续费后使用",
       "lowData": "剩余流量较低，请留意使用",
-      "dataExhausted": "流量已用尽，请续费后使用"
+      "daysLeft": "还剩 {{count}} 天",
+      "usedOfTotal": "已用 {{used}} / 共 {{total}}",
+      "usage": "流量使用情况",
+      "contactSupport": "复制客服微信，联系续费",
+      "renewHint": "续费后点击下方的“更新线路”刷新账户状态"
+    },
+    "compatibility": {
+      "mode": "连接方式",
+      "standard": "标准",
+      "enhanced": "增强兼容",
+      "switching": "正在切换...",
+      "incomplete": "兼容连接未就绪",
+      "permissionTitle": "允许增强兼容？",
+      "permissionBody": "允许 PewPew 云客户端安装或使用后台服务并接管应用网络？系统可能请求管理员授权，切换时连接可能短暂中断。",
+      "allow": "允许",
+      "changeFailed": "切换未完成，请检查系统授权或重试。",
+      "serviceConflict": "检测到其他客户端的后台服务。为避免冲突，尚未启用增强兼容，请联系客服。",
+      "rollbackFailed": "连接切换失败，未能完全恢复原状态。请点击恢复网络或联系客服。",
+      "udpUnsupported": "当前线路未启用 UDP，语音可能无法连接，请尝试其他线路。",
+      "check": "检查连接",
+      "checking": "正在检查",
+      "checkFailed": "未能读取连接状态，请重试。",
+      "core": "连接核心",
+      "systemProxy": "系统代理",
+      "service": "PewPew 后台服务",
+      "active": "已启用",
+      "inactive": "未启用",
+      "udp": "线路 UDP 能力",
+      "supported": "声明支持",
+      "unsupported": "未启用",
+      "unknown": "未知",
+      "voice": "语音连通性",
+      "notTested": "尚未实测",
+      "standardHint": "适合浏览器和大多数应用",
+      "enhancedHint": "适合游戏、Discord 语音等不走系统代理的应用，首次使用需要授权",
+      "serviceUnavailable": "后台服务还没准备好。增强兼容需要系统授权，请重试",
+      "switchToEnhanced": "切换到增强兼容",
+      "summaryCoreDown": "连接核心没有运行，请点击“恢复网络”或重启客户端",
+      "summaryEnhancedActive": "增强兼容已启用，游戏和语音连通性仍需实际测试。",
+      "summaryEnhancedMissing": "系统代理已开启，但增强兼容没有生效。请重新连接或恢复网络",
+      "summaryStandardActive": "标准连接已生效。如果游戏或语音连不上，可以切换到增强兼容",
+      "summaryDisconnected": "当前未连接"
     },
     "connectionStatus": {
       "title": "连接状态",
@@ -175,22 +212,28 @@
       "disconnectFailed": "断开连接失败，请稍后重试",
       "repairNetwork": "恢复网络",
       "repairSuccess": "网络已恢复，请重新连接",
-      "repairFailed": "恢复失败，请联系客服"
+      "repairFailed": "恢复失败，请联系客服",
+      "loading": "正在加载线路…",
+      "updatingRoutes": "正在更新线路…",
+      "coreUnavailable": "连接核心没有运行，请点击“恢复网络”或重启客户端",
+      "verificationFailed": "连接设置没有生效，请重试或点击“恢复网络”"
     },
     "connection": {
-      "title": "连接设置",
       "route": "线路",
       "mode": "模式",
       "selectRoute": "选择线路",
       "importFirst": "当前没有可用线路，请先导入线路",
       "noAvailableRoutes": "没有可用线路，请更新订阅或联系客服",
       "smartMode": "智能模式",
-      "recommended": "推荐",
-      "recommendedShort": "推荐",
-      "smartModeDescription": "自动选择合适的连接方式",
+      "smartModeDescription": "按订阅规则自动分流，推荐使用",
       "globalMode": "全局模式",
-      "globalModeDescription": "所有连接使用当前线路",
-      "routeChangeFailed": "线路切换失败，请稍后重试或联系客服"
+      "globalModeDescription": "所有流量都经过当前线路",
+      "routeChangeFailed": "线路切换失败，请稍后重试或联系客服",
+      "directMode": "直连模式",
+      "directModeHint": "当前是直连模式（可能来自托盘菜单），流量不经过线路。选择上方任一模式即可恢复",
+      "modeChangeFailed": "模式切换失败，请稍后重试",
+      "directModeActive": "直连模式：流量不经过线路",
+      "directModeBeforeConnect": "当前为直连模式，连接时会切换到智能模式"
     },
     "delay": {
       "testing": "测试中",
@@ -202,14 +245,12 @@
       "title": "线路订阅",
       "subscriptionLink": "订阅链接",
       "localFile": "本地配置文件",
-      "description": "粘贴链接后导入或更新线路",
       "placeholder": "粘贴订阅链接",
       "import": "导入线路",
       "update": "更新线路",
       "importYaml": "导入 YAML 文件",
       "yamlSupport": "支持 .yaml / .yml 配置文件",
       "dropYaml": "拖拽 YAML 文件到这里导入",
-      "orImportYaml": "或点击导入 YAML 文件",
       "yamlImporting": "正在导入 YAML 文件...",
       "yamlSuccess": "YAML 文件导入成功，请选择线路并连接",
       "yamlFailed": "YAML 文件导入失败，请检查文件格式",
@@ -229,14 +270,15 @@
       "importFailed": "线路导入失败，请检查订阅链接或联系客服",
       "updateFailed": "线路更新失败，请检查订阅链接或联系客服",
       "temporarilyStopped": "已临时断开连接，正在更新线路",
-      "autoUpdateFailed": "线路自动更新失败，可手动更新"
+      "autoUpdateFailed": "线路自动更新失败，可手动更新",
+      "changeLink": "更换订阅"
     },
     "onboarding": {
-      "title": "开始使用 PewPew 云",
+      "title": "导入线路，开始使用",
       "stepPaste": "粘贴订阅链接",
       "stepImport": "导入线路",
       "stepConnect": "选择线路并连接",
-      "importRoutes": "去导入线路"
+      "description": "粘贴 PewPew 云订阅链接导入线路，也可以导入 YAML 配置文件。"
     },
     "diagnostics": {
       "copy": "复制诊断信息",
@@ -250,16 +292,15 @@
       "light": "浅色模式",
       "dark": "深色模式",
       "language": "语言",
-      "simplifiedChinese": "简体中文",
-      "english": "English",
       "startup": "启动",
       "autoLaunch": "开机自动启动客户端",
       "silentStart": "启动后最小化到托盘",
       "autoUpdateRoutesOnStartup": "启动时自动更新线路",
-      "autoStartPewPew": "启动后自动连接",
-      "safety": "安全",
-      "autoCloseOnQuit": "退出软件时断开连接",
-      "saveFailed": "设置保存失败，请稍后重试"
+      "saveFailed": "设置保存失败，请稍后重试",
+      "connection": "连接",
+      "autoCloseConnections": "切换线路时断开旧连接",
+      "autoCloseConnectionsHint": "切换线路或模式后，正在进行的连接会立即改用新线路",
+      "restoreHint": "退出时如果处于已连接状态，下次启动会自动恢复连接。"
     },
     "about": {
       "title": "关于 / 开源许可",
@@ -269,7 +310,14 @@
       "licenseTitle": "开源许可",
       "credits": "上游致谢",
       "support": "客服微信：PewPew_VPN",
-      "close": "关闭"
+      "close": "关闭",
+      "version": "版本 {{version}}"
+    },
+    "route": {
+      "autoSelected": "未选中有效线路，已自动切换到：{{name}}",
+      "noneSelected": "还没有选择线路，连接时会自动选择",
+      "invalidWhileConnected": "当前没有选中有效线路，请在右侧选择线路",
+      "switchedToSmart": "直连模式不经过线路，已切换到智能模式"
     }
   }
 }

@@ -10,6 +10,45 @@ import { useVerge } from '@/hooks/use-verge'
 import { defaultDarkTheme, defaultTheme } from '@/pages/_theme'
 import { useSetThemeMode, useThemeMode } from '@/services/states'
 
+const PEWPEW_DARK_PRIMARY_TEXT = '#0b1530'
+
+// PewPew keeps button labels in sentence case, rounder dialogs and frosted
+// navy tooltips that match the glass home page.
+const PEWPEW_COMPONENTS = {
+  MuiButton: { styleOverrides: { root: { textTransform: 'none' as const } } },
+  MuiToggleButton: {
+    styleOverrides: { root: { textTransform: 'none' as const } },
+  },
+  MuiDialog: { styleOverrides: { paper: { borderRadius: 22 } } },
+  MuiAlert: {
+    styleOverrides: {
+      root: ({ theme }: { theme: MuiTheme }) => ({
+        borderRadius: 12,
+        // Toasts float over glass cards; give them depth.
+        '&.MuiAlert-filled': {
+          boxShadow:
+            theme.palette.mode === 'light'
+              ? '0 12px 30px rgba(15, 23, 42, 0.2) !important'
+              : '0 12px 30px rgba(0, 0, 0, 0.5) !important',
+        },
+      }),
+    },
+  },
+  MuiTooltip: {
+    styleOverrides: {
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.86)',
+        WebkitBackdropFilter: 'blur(8px)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: 8,
+        fontSize: 12,
+        fontWeight: 600,
+        padding: '6px 10px',
+      },
+    },
+  },
+}
+
 const CSS_INJECTION_SCOPE_ROOT = '[data-css-injection-root]'
 const CSS_INJECTION_SCOPE_LIMIT =
   ':is(.monaco-editor .view-lines, .monaco-editor .view-line, .monaco-editor .margin, .monaco-editor .margin-view-overlays, .monaco-editor .view-overlays, .monaco-editor [class^="mtk"], .monaco-editor [class*=" mtk"])'
@@ -153,7 +192,13 @@ export const useCustomTheme = () => {
         },
         palette: {
           mode,
-          primary: { main: setting.primary_color || dt.primary_color },
+          primary: {
+            main: setting.primary_color || dt.primary_color,
+            // The brighter dark-mode brand blue needs dark text on filled buttons.
+            ...(mode === 'dark' && !setting.primary_color
+              ? { contrastText: PEWPEW_DARK_PRIMARY_TEXT }
+              : {}),
+          },
           secondary: { main: setting.secondary_color || dt.secondary_color },
           info: { main: setting.info_color || dt.info_color },
           error: { main: setting.error_color || dt.error_color },
@@ -174,6 +219,7 @@ export const useCustomTheme = () => {
             ? `${setting.font_family}, ${dt.font_family}`
             : dt.font_family,
         },
+        components: PEWPEW_COMPONENTS,
       })
     } catch (e) {
       console.error('Error creating MUI theme, falling back to defaults:', e)
@@ -183,7 +229,12 @@ export const useCustomTheme = () => {
         },
         palette: {
           mode,
-          primary: { main: dt.primary_color },
+          primary: {
+            main: dt.primary_color,
+            ...(mode === 'dark'
+              ? { contrastText: PEWPEW_DARK_PRIMARY_TEXT }
+              : {}),
+          },
           secondary: { main: dt.secondary_color },
           info: { main: dt.info_color },
           error: { main: dt.error_color },
@@ -196,6 +247,7 @@ export const useCustomTheme = () => {
           },
         },
         typography: { fontFamily: dt.font_family },
+        components: PEWPEW_COMPONENTS,
       })
     }
 

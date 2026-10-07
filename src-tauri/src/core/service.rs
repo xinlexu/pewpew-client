@@ -40,6 +40,62 @@ const WINDOWS_SERVICE_DISPLAY_NAME: &str = "PewPew Background Service";
 const WINDOWS_SERVICE_DESCRIPTION: &str = "PewPew Background Service helps to launch the connection core";
 
 #[cfg(target_os = "windows")]
+pub fn ensure_service_owned() -> Result<()> {
+    use winreg::{
+        RegKey,
+        enums::{HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_64KEY},
+    };
+
+    let root = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let key = match root.open_subkey_with_flags(
+        format!(r"SYSTEM\CurrentControlSet\Services\{WINDOWS_SERVICE_NAME}"),
+        KEY_READ | KEY_WOW64_64KEY,
+    ) {
+        Ok(key) => key,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    let image_path: String = key.get_value("ImagePath")?;
+    let expected = dirs::service_path()?;
+    if !service_path_matches(&image_path, &expected.to_string_lossy()) {
+        bail!("pewpew-service-conflict");
+    }
+    Ok(())
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn service_path_matches(actual: &str, expected: &str) -> bool {
+    actual.trim().trim_matches('"').eq_ignore_ascii_case(expected)
+}
+
+pub async fn prepare_enhanced_connection() -> Result<()> {
+    use crate::core::{CoreManager, handle::Handle, manager::RunningMode};
+
+    #[cfg(target_os = "windows")]
+    ensure_service_owned()?;
+
+    let core = CoreManager::global();
+    if tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin(Handle::app_handle())
+        && matches!(*core.get_running_mode(), RunningMode::Sidecar)
+    {
+        return Ok(());
+    }
+    let status = if is_service_available().await.is_err() {
+        ServiceStatus::InstallRequired
+    } else {
+        ServiceStatus::Ready
+    };
+    SERVICE_MANAGER.lock().await.handle_service_status(&status).await?;
+    if !matches!(*core.get_running_mode(), RunningMode::Service) {
+        core.restart_core().await?;
+    }
+    if !matches!(*core.get_running_mode(), RunningMode::Service) {
+        bail!("pewpew-service-unavailable");
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
 fn apply_service_branding_privileged() -> Result<()> {
     use std::os::windows::process::CommandExt as _;
 
@@ -622,7 +678,19 @@ pub static SERVICE_MANAGER: Lazy<Mutex<ServiceManager>> = Lazy::new(|| Mutex::ne
 
 #[cfg(test)]
 mod tests {
-    use super::macos_service_admin_script;
+    use super::{macos_service_admin_script, service_path_matches};
+
+    #[test]
+    fn service_ownership_rejects_another_installation() {
+        let expected = r"C:\PewPew Cloud\resources\clash-verge-service.exe";
+        assert!(service_path_matches(&format!("\"{expected}\""), expected));
+        assert!(service_path_matches(&expected.to_lowercase(), expected));
+        assert!(!service_path_matches(
+            r"C:\Other Client\resources\clash-verge-service.exe",
+            expected
+        ));
+        assert!(!service_path_matches(&format!("{expected} --other"), expected));
+    }
 
     #[test]
     fn macos_service_paths_and_prompts_are_quoted() {

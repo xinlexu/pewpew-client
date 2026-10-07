@@ -797,13 +797,13 @@ async fn create_tray_menu(
     let system_proxy = &CheckMenuItem::with_id(
         app_handle,
         MenuIds::SYSTEM_PROXY,
-        if system_proxy_enabled {
+        if system_proxy_enabled || tun_mode_enabled {
             &texts.disconnect
         } else {
             &texts.connect
         },
         true,
-        system_proxy_enabled,
+        system_proxy_enabled || tun_mode_enabled,
         hotkeys.get("toggle_system_proxy").map(|s| s.as_str()),
     )?;
 
@@ -1008,8 +1008,8 @@ fn on_menu_event(_: &AppHandle, event: MenuEvent) {
                 feat::toggle_system_proxy().await;
             }
             MenuIds::UPDATE_ROUTES => {
-                let system_proxy_enabled = Config::verge().await.latest_arc().enable_system_proxy.unwrap_or(false);
-                if system_proxy_enabled {
+                let verge = Config::verge().await.latest_arc();
+                if verge.enable_system_proxy.unwrap_or(false) || verge.enable_tun_mode.unwrap_or(false) {
                     if let Err(err) = handle::Handle::mihomo().await.close_all_connections().await {
                         logging!(
                             warn,
@@ -1017,15 +1017,15 @@ fn on_menu_event(_: &AppHandle, event: MenuEvent) {
                             "Failed to close connections before tray route update: {err}"
                         );
                     }
-                    let patch = IVerge {
-                        enable_system_proxy: Some(false),
-                        ..IVerge::default()
-                    };
-                    if let Err(err) = feat::patch_verge(&patch, false).await {
+                    if let Err(err) = feat::disconnect_connection().await {
                         logging!(
                             error,
                             Type::Tray,
                             "Failed to disconnect before tray route update: {err}"
+                        );
+                        handle::Handle::notice_message(
+                            "set_config::error",
+                            "home.pewpew.connectionStatus.disconnectFailed",
                         );
                         return;
                     }
@@ -1057,12 +1057,9 @@ fn on_menu_event(_: &AppHandle, event: MenuEvent) {
                         "Failed to close connections from repair action: {err}"
                     );
                 }
-                let patch = IVerge {
-                    enable_system_proxy: Some(false),
-                    ..IVerge::default()
-                };
-                if let Err(err) = feat::patch_verge(&patch, false).await {
+                if let Err(err) = feat::disconnect_connection().await {
                     logging!(error, Type::Tray, "Failed to repair network from tray: {err}");
+                    handle::Handle::notice_message("set_config::error", "home.pewpew.connectionStatus.repairFailed");
                 } else {
                     handle::Handle::refresh_verge();
                 }

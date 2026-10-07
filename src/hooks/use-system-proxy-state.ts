@@ -19,25 +19,18 @@ export const useSystemProxyState = () => {
     refetchOnReconnect: true,
   })
 
-  const {
-    enable_system_proxy,
-    proxy_auto_config,
-    proxy_host,
-    verge_mixed_port,
-  } = verge ?? {}
+  const { enable_system_proxy, proxy_host, verge_mixed_port } = verge ?? {}
 
   // OS 实际状态：enable + 地址匹配本应用
   const indicator = (() => {
     const host = proxy_host || '127.0.0.1'
-    if (proxy_auto_config) {
-      if (!autoproxy?.enable) return false
-      const pacPort = import.meta.env.DEV ? 11233 : 33331
-      return autoproxy.url === `http://${host}:${pacPort}/commands/pac`
-    } else {
-      if (!sysproxy?.enable) return false
-      const port = verge_mixed_port || clashConfig?.mixedPort || 7897
-      return sysproxy.server === `${host}:${port}`
-    }
+    const port = verge_mixed_port || clashConfig?.mixedPort || 7897
+    const pacPort = import.meta.env.DEV ? 11233 : 33331
+    return Boolean(
+      (sysproxy?.enable && sysproxy.server === `${host}:${port}`) ||
+        (autoproxy?.enable &&
+          autoproxy.url === `http://${host}:${pacPort}/commands/pac`),
+    )
   })()
 
   // "最后一次生效"模式：快速连续点击时，只执行最终状态

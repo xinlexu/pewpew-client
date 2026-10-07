@@ -1,3 +1,4 @@
+import { useMutation } from '@tanstack/react-query'
 import { useCallback, useMemo, useRef } from 'react'
 import {
   closeConnection,
@@ -90,7 +91,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
   )
 
   const executeChange = useCallback(
-    async (request: ProxyChangeRequest) => {
+    async (request: ProxyChangeRequest): Promise<boolean> => {
       const { groupName, proxyName, previousProxy, skipConfigSave } = request
       const path = request.path || [{ groupName, proxyName, previousProxy }]
       debugLog(`[ProxySelection] 代理切换: ${groupName} -> ${proxyName}`)
@@ -111,6 +112,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
         ) {
           setTimeout(() => cleanupConnections(previousProxy), 0)
         }
+        return true
       } catch (error) {
         console.error(
           `[ProxySelection] 代理切换失败: ${groupName} -> ${proxyName}`,
@@ -125,17 +127,25 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
           debugLog(
             `[ProxySelection] 代理切换回退成功: ${groupName} -> ${proxyName}`,
           )
+          return true
         } catch (fallbackError) {
           console.error(
             `[ProxySelection] 代理切换回退也失败: ${groupName} -> ${proxyName}`,
             fallbackError,
           )
           onError?.(fallbackError)
+          return false
         }
       }
     },
     [config, onError, onSuccess, persistSelection, syncTraySelection],
   )
+
+  const { mutateAsync: selectQueued } = useMutation({
+    mutationKey: ['pewpewRoutes', 'selection'],
+    scope: { id: 'pewpewRouteSelection' },
+    mutationFn: executeChange,
+  })
 
   const flushChangeQueue = useCallback(async () => {
     if (isProcessingRef.current) return
@@ -145,7 +155,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
       while (pendingRequestRef.current) {
         const request = pendingRequestRef.current
         pendingRequestRef.current = null
-        await executeChange(request)
+        await selectQueued(request)
       }
     } finally {
       isProcessingRef.current = false
@@ -153,7 +163,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
         void flushChangeQueue()
       }
     }
-  }, [executeChange])
+  }, [selectQueued])
 
   const changeProxy = useCallback(
     (
@@ -173,6 +183,24 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
       void flushChangeQueue()
     },
     [flushChangeQueue],
+  )
+
+  // Awaitable variant used when the UI must know the route is applied first.
+  const selectRoute = useCallback(
+    (
+      groupName: string,
+      proxyName: string,
+      previousProxy?: string,
+      path?: PewPewRouteSelection[],
+    ) =>
+      selectQueued({
+        groupName,
+        proxyName,
+        previousProxy,
+        skipConfigSave: false,
+        path,
+      }),
+    [selectQueued],
   )
 
   const handleSelectChange = useCallback(
@@ -197,6 +225,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
 
   return {
     changeProxy,
+    selectRoute,
     handleSelectChange,
     handleProxyGroupChange,
   }

@@ -1,33 +1,79 @@
 use crate::{
     config::{Config, IVerge},
-    core::handle,
+    core::{handle, service},
+    module::lightweight,
+    utils::window_manager::WindowManager,
 };
+use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use std::env;
 use tauri_plugin_clipboard_manager::ClipboardExt as _;
 
-/// Toggle system proxy on/off
-pub async fn toggle_system_proxy() -> bool {
-    let verge = Config::verge().await;
-    let current = verge.latest_arc().enable_system_proxy.unwrap_or(false);
-    let auto_close_connection = verge.latest_arc().auto_close_connection.unwrap_or(false);
-
-    // 如果当前系统代理即将关闭，且自动关闭连接设置为true，则关闭所有连接
-    if current
-        && auto_close_connection
-        && let Err(err) = handle::Handle::mihomo().await.close_all_connections().await
-    {
-        logging!(error, Type::ProxyMode, "Failed to close all connections: {err}");
+fn connection_patch(enabled: bool, verge: &IVerge) -> IVerge {
+    IVerge {
+        enable_system_proxy: Some(enabled),
+        enable_tun_mode: Some(enabled && verge.pewpew_enhanced_mode.or(verge.enable_tun_mode).unwrap_or(false)),
+        ..IVerge::default()
     }
+}
 
-    let requested = !current;
-    let patch_result = super::patch_verge(
+pub async fn disconnect_connection() -> Result<()> {
+    let verge = Config::verge().await.latest_arc();
+    super::patch_verge(
         &IVerge {
-            enable_system_proxy: Some(requested),
+            enable_system_proxy: Some(false),
             ..IVerge::default()
         },
         false,
     )
+    .await?;
+    let actual_tun = handle::Handle::mihomo()
+        .await
+        .get_base_config()
+        .await
+        .ok()
+        .is_some_and(|config| config.tun.enable);
+    // Keep the system proxy off even when stopping enhanced routing fails.
+    if actual_tun || verge.enable_tun_mode.unwrap_or(false) {
+        super::patch_verge(
+            &IVerge {
+                enable_tun_mode: Some(false),
+                ..IVerge::default()
+            },
+            false,
+        )
+        .await?;
+    }
+    if verge.auto_close_connection.unwrap_or(false)
+        && let Err(err) = handle::Handle::mihomo().await.close_all_connections().await
+    {
+        logging!(error, Type::ProxyMode, "Failed to close all connections: {err}");
+    }
+    Ok(())
+}
+
+/// Tray and hotkey actions follow the same remembered connection mode as home.
+pub async fn toggle_system_proxy() -> bool {
+    let verge = Config::verge().await.latest_arc();
+    let current = verge.enable_system_proxy.unwrap_or(false) || verge.enable_tun_mode.unwrap_or(false);
+    let requested = !current;
+    let patch = connection_patch(requested, &verge);
+    if requested && patch.enable_tun_mode == Some(true) && !verge.pewpew_enhanced_accepted.unwrap_or(false) {
+        if !lightweight::exit_lightweight_mode().await {
+            WindowManager::show_main_window().await;
+        }
+        return current;
+    }
+
+    let patch_result: Result<()> = async {
+        if !requested {
+            return disconnect_connection().await;
+        }
+        if patch.enable_tun_mode == Some(true) {
+            service::prepare_enhanced_connection().await?;
+        }
+        super::patch_verge(&patch, false).await
+    }
     .await;
 
     match patch_result {
@@ -37,6 +83,12 @@ pub async fn toggle_system_proxy() -> bool {
         }
         Err(err) => {
             logging!(error, Type::ProxyMode, "{err}");
+            let message = if err.to_string().contains("pewpew-service-conflict") {
+                "home.pewpew.compatibility.serviceConflict"
+            } else {
+                "home.pewpew.compatibility.changeFailed"
+            };
+            handle::Handle::notice_message("set_config::error", message);
             current
         }
     }
@@ -113,5 +165,36 @@ pub async fn copy_clash_env() {
 
     if clipboard.write_text(&export_text).is_err() {
         logging!(error, Type::ProxyMode, "Failed to write to clipboard");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::connection_patch;
+    use crate::config::IVerge;
+
+    #[test]
+    fn tray_connect_uses_remembered_mode_without_changing_preference() {
+        let config = IVerge {
+            pewpew_enhanced_mode: Some(true),
+            ..IVerge::default()
+        };
+        let connect = connection_patch(true, &config);
+        assert_eq!(connect.enable_system_proxy, Some(true));
+        assert_eq!(connect.enable_tun_mode, Some(true));
+        assert_eq!(connect.pewpew_enhanced_mode, None);
+        let disconnect = connection_patch(false, &config);
+        assert_eq!(disconnect.enable_system_proxy, Some(false));
+        assert_eq!(disconnect.enable_tun_mode, Some(false));
+    }
+
+    #[test]
+    fn standard_mode_does_not_retain_legacy_tun_flag() {
+        let config = IVerge {
+            pewpew_enhanced_mode: Some(false),
+            enable_tun_mode: Some(true),
+            ..IVerge::default()
+        };
+        assert_eq!(connection_patch(true, &config).enable_tun_mode, Some(false));
     }
 }

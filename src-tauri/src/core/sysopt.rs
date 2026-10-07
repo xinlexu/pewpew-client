@@ -40,6 +40,46 @@ pub struct Sysopt {
     guard: Arc<RwLock<GuardMonitor>>,
 }
 
+pub struct ProxySnapshot {
+    current: (Sysproxy, Autoproxy),
+    managed: (Sysproxy, Autoproxy),
+}
+
+fn owns_system_proxy(expected: &Sysproxy, current: &Sysproxy) -> bool {
+    !expected.host.is_empty() && expected.port != 0 && expected.host == current.host && expected.port == current.port
+}
+
+fn disconnected_proxy_state(
+    (mut sys, mut auto): (Sysproxy, Autoproxy),
+    managed: &[(Sysproxy, Autoproxy)],
+) -> Option<(Sysproxy, Autoproxy)> {
+    let owns_sys = sys.enable && managed.iter().any(|(expected, _)| owns_system_proxy(expected, &sys));
+    let owns_auto = auto.enable
+        && managed
+            .iter()
+            .any(|(_, expected)| !expected.url.is_empty() && expected.url == auto.url);
+    if !owns_sys && !owns_auto {
+        return None;
+    }
+    if owns_sys {
+        sys.enable = false;
+    }
+    if owns_auto {
+        auto.enable = false;
+    }
+    Some((sys, auto))
+}
+
+fn apply_proxy_pair((sys, auto): (Sysproxy, Autoproxy)) -> Result<()> {
+    for step in proxy_apply_steps(sys.enable, auto.enable) {
+        match step {
+            ProxyApplyStep::Sysproxy => sys.set_system_proxy()?,
+            ProxyApplyStep::Autoproxy => auto.set_auto_proxy()?,
+        }
+    }
+    Ok(())
+}
+
 impl Default for Sysopt {
     fn default() -> Self {
         Self {
@@ -131,9 +171,44 @@ impl Sysopt {
         let _ = self.update_lock.lock().await;
     }
 
+    pub async fn snapshot_proxy(&self) -> Result<ProxySnapshot> {
+        let _lock = self.update_lock.lock().await;
+        let current = tokio::task::spawn_blocking(|| -> Result<_> {
+            Ok((Sysproxy::get_system_proxy()?, Autoproxy::get_auto_proxy()?))
+        })
+        .await??;
+        Ok(ProxySnapshot {
+            current,
+            managed: self.inner_proxy.read().clone(),
+        })
+    }
+
+    pub async fn restore_proxy_snapshot(&self, snapshot: ProxySnapshot) -> Result<()> {
+        let _lock = self.update_lock.lock().await;
+        self.access_guard().write().set_guard_type(GuardType::None);
+        tokio::task::spawn_blocking(move || apply_proxy_pair(snapshot.current)).await??;
+        let verge = Config::verge().await.latest_arc();
+        let guard_type = if verge.enable_proxy_guard.unwrap_or_default() {
+            if snapshot.managed.1.enable {
+                GuardType::Autoproxy(snapshot.managed.1.clone())
+            } else if snapshot.managed.0.enable {
+                GuardType::Sysproxy(snapshot.managed.0.clone())
+            } else {
+                GuardType::None
+            }
+        } else {
+            GuardType::None
+        };
+        *self.inner_proxy.write() = snapshot.managed;
+        self.access_guard().write().set_guard_type(guard_type);
+        self.refresh_guard().await;
+        Ok(())
+    }
+
     /// init the sysproxy
     pub async fn update_sysproxy(&self) -> Result<()> {
         let _lock = self.update_lock.lock().await;
+        let previously_managed = self.inner_proxy.read().clone();
 
         let verge = Config::verge().await.latest_arc();
         let port = match verge.verge_mixed_port {
@@ -158,7 +233,7 @@ impl Sysopt {
             auto.url = format!("http://{proxy_host}:{pac_port}/commands/pac");
 
             // `enable_system_proxy` is the master switch.
-            // When disabled, force clear both global proxy and PAC at OS level.
+            // When disabled, clear only this client's global proxy and PAC.
             let guard_type = if !sys_enable {
                 sys.enable = false;
                 auto.enable = false;
@@ -186,16 +261,15 @@ impl Sysopt {
 
         self.access_guard().write().set_guard_type(guard_type);
 
-        let apply_steps = proxy_apply_steps(sys.enable, auto.enable);
-
         tokio::task::spawn_blocking(move || -> Result<()> {
-            for step in apply_steps {
-                match step {
-                    ProxyApplyStep::Autoproxy => auto.set_auto_proxy()?,
-                    ProxyApplyStep::Sysproxy => sys.set_system_proxy()?,
+            if !sys.enable && !auto.enable {
+                let current = (Sysproxy::get_system_proxy()?, Autoproxy::get_auto_proxy()?);
+                if let Some(next) = disconnected_proxy_state(current, &[(sys, auto), previously_managed]) {
+                    apply_proxy_pair(next)?;
                 }
+                return Ok(());
             }
-            Ok(())
+            apply_proxy_pair((sys, auto))
         })
         .await??;
 
@@ -214,11 +288,12 @@ impl Sysopt {
         defer! {
             self.reset_sysproxy.store(false, Ordering::SeqCst);
         }
+        let _lock = self.update_lock.lock().await;
 
         // close proxy guard
         self.access_guard().write().set_guard_type(GuardType::None);
 
-        // 直接关闭所有代理
+        // Leave settings owned by other applications untouched on exit.
         let (sys, auto) = {
             let (sys, auto) = &mut *self.inner_proxy.write();
             sys.enable = false;
@@ -227,8 +302,10 @@ impl Sysopt {
         };
 
         tokio::task::spawn_blocking(move || -> Result<()> {
-            sys.set_system_proxy()?;
-            auto.set_auto_proxy()?;
+            let current = (Sysproxy::get_system_proxy()?, Autoproxy::get_auto_proxy()?);
+            if let Some(next) = disconnected_proxy_state(current, &[(sys, auto)]) {
+                apply_proxy_pair(next)?;
+            }
             Ok(())
         })
         .await??;
@@ -239,7 +316,60 @@ impl Sysopt {
 
 #[cfg(test)]
 mod tests {
-    use super::{ProxyApplyStep, proxy_apply_steps};
+    use super::{ProxyApplyStep, disconnected_proxy_state, proxy_apply_steps};
+    use sysproxy::{Autoproxy, Sysproxy};
+
+    fn proxy_pair(host: &str, url: &str) -> (Sysproxy, Autoproxy) {
+        (
+            Sysproxy {
+                enable: true,
+                host: host.into(),
+                port: 7897,
+                ..Default::default()
+            },
+            Autoproxy {
+                enable: true,
+                url: url.into(),
+            },
+        )
+    }
+
+    #[test]
+    fn disconnect_preserves_foreign_proxy_settings() {
+        let ours = proxy_pair("127.0.0.1", "http://127.0.0.1:33331/commands/pac");
+        let foreign = proxy_pair("office.example", "https://office.example/proxy.pac");
+        assert!(disconnected_proxy_state(foreign, &[ours]).is_none());
+    }
+
+    #[test]
+    fn disconnect_clears_only_our_manual_proxy() -> anyhow::Result<()> {
+        let ours = proxy_pair("127.0.0.1", "http://127.0.0.1:33331/commands/pac");
+        let current = proxy_pair("127.0.0.1", "https://office.example/proxy.pac");
+        let (sys, auto) = disconnected_proxy_state(current, &[ours])
+            .ok_or_else(|| anyhow::anyhow!("managed manual proxy was not recognized"))?;
+        assert!(!sys.enable);
+        assert!(auto.enable);
+        assert_eq!(auto.url, "https://office.example/proxy.pac");
+        Ok(())
+    }
+
+    #[test]
+    fn disconnect_clears_only_our_pac() -> anyhow::Result<()> {
+        let ours = proxy_pair("127.0.0.1", "http://127.0.0.1:33331/commands/pac");
+        let current = proxy_pair("office.example", &ours.1.url);
+        let (sys, auto) = disconnected_proxy_state(current, &[ours])
+            .ok_or_else(|| anyhow::anyhow!("managed PAC was not recognized"))?;
+        assert!(sys.enable);
+        assert_eq!(sys.host, "office.example");
+        assert!(!auto.enable);
+        Ok(())
+    }
+
+    #[test]
+    fn uninitialized_proxy_is_not_owned() {
+        let current = proxy_pair("office.example", "");
+        assert!(disconnected_proxy_state(current, &[(Sysproxy::default(), Autoproxy::default())]).is_none());
+    }
 
     #[test]
     fn pure_sysproxy_mode_clears_pac_before_enabling_global_proxy() {

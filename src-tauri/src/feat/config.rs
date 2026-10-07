@@ -8,6 +8,9 @@ use bitflags::bitflags;
 use clash_verge_draft::SharedDraft;
 use clash_verge_logging::{Type, logging, logging_error};
 use serde_yaml_ng::Mapping;
+use tokio::sync::Mutex;
+
+static VERGE_PATCH_LOCK: Mutex<()> = Mutex::const_new(());
 
 /// Patch Clash configuration
 pub async fn patch_clash(patch: &Mapping) -> Result<()> {
@@ -206,7 +209,14 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         CoreManager::global().restart_core().await?;
     }
     if update_flags.contains(UpdateFlags::CLASH_CONFIG) {
-        CoreManager::global().update_config_checked().await?;
+        if matches!(
+            *CoreManager::global().get_running_mode(),
+            crate::core::manager::RunningMode::NotRunning
+        ) {
+            Config::generate().await?;
+        } else {
+            CoreManager::global().update_config_checked().await?;
+        }
         handle::Handle::refresh_clash();
     }
     if update_flags.contains(UpdateFlags::VERGE_CONFIG) {
@@ -269,27 +279,51 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
 }
 
 pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
-    Config::verge().await.edit_draft(|d| d.patch_config(patch));
-
+    let _guard = VERGE_PATCH_LOCK.lock().await;
+    let previous = Config::verge().await.data_arc();
     let update_flags = determine_update_flags(patch);
-    logging!(debug, Type::Setup, "Determined update flags: {:?}", update_flags);
-    let process_flag_result: std::result::Result<(), anyhow::Error> = {
-        process_terminated_flags(update_flags, patch).await?;
-        Ok(())
+    let proxy_snapshot = if update_flags.contains(UpdateFlags::SYS_PROXY) {
+        Some(sysopt::Sysopt::global().snapshot_proxy().await?)
+    } else {
+        None
     };
+    Config::verge().await.edit_draft(|d| d.patch_config(patch));
+    logging!(debug, Type::Setup, "Determined update flags: {:?}", update_flags);
+    let process_flag_result: Result<()> = async {
+        process_terminated_flags(update_flags, patch).await?;
+        if !not_save_file {
+            Config::verge().await.latest_arc().save_file().await?;
+        }
+        Ok(())
+    }
+    .await;
 
     if let Err(err) = process_flag_result {
         Config::verge().await.discard();
+        let network_flags = update_flags & (UpdateFlags::CLASH_CONFIG | UpdateFlags::GROUP_SYS_TRAY);
+        let mut restore_errors = Vec::new();
+        if !network_flags.is_empty()
+            && let Err(restore_error) = process_terminated_flags(network_flags, &previous).await
+        {
+            restore_errors.push(restore_error.to_string());
+        }
+        if let Some(snapshot) = proxy_snapshot
+            && let Err(error) = sysopt::Sysopt::global().restore_proxy_snapshot(snapshot).await
+        {
+            restore_errors.push(error.to_string());
+        }
+        handle::Handle::refresh_verge();
+        if !restore_errors.is_empty() {
+            return Err(anyhow::anyhow!(
+                "pewpew-connection-rollback-failed: {err}; {}",
+                restore_errors.join("; ")
+            ));
+        }
         return Err(err);
     }
     Config::verge().await.apply();
     logging_error!(Type::Backup, AutoBackupManager::global().refresh_settings().await);
-    if !not_save_file {
-        // 分离数据获取和异步调用
-        let verge_data = Config::verge().await.data_arc();
-        logging!(debug, Type::Setup, "Saving PewPew Cloud configuration to file...");
-        verge_data.save_file().await?;
-    }
+    handle::Handle::refresh_verge();
     Ok(())
 }
 

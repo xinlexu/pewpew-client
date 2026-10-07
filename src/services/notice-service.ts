@@ -14,6 +14,7 @@ interface NoticeItem {
   readonly duration: number
   readonly message?: ReactNode
   readonly i18n?: NoticeTranslationDescriptor
+  readonly signature?: string
   timerId?: ReturnType<typeof setTimeout>
 }
 
@@ -45,6 +46,7 @@ const DEFAULT_DURATIONS: Readonly<Record<NoticeType, number>> = {
 }
 
 const TRANSLATION_KEY_PATTERN = /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$/
+const MAX_VISIBLE_NOTICES = 4
 
 let nextId = 0
 let notices: NoticeItem[] = []
@@ -113,13 +115,35 @@ function buildNotice(
   duration: number,
   payload: { message?: ReactNode; i18n?: NoticeTranslationDescriptor },
   timerId?: ReturnType<typeof setTimeout>,
+  signature?: string,
 ): NoticeItem {
   return {
     id,
     type,
     duration,
     timerId,
+    signature,
     ...payload,
+  }
+}
+
+// Identical notices that are still visible are merged instead of stacked.
+function getNoticeSignature(
+  type: NoticeType,
+  payload: { message?: ReactNode; i18n?: NoticeTranslationDescriptor },
+) {
+  if (payload.message !== undefined && typeof payload.message !== 'string') {
+    return undefined
+  }
+  try {
+    return JSON.stringify([
+      type,
+      payload.i18n?.key ?? null,
+      payload.i18n?.params ?? null,
+      payload.message ?? null,
+    ])
+  } catch {
+    return undefined
   }
 }
 
@@ -289,24 +313,51 @@ const baseShowNotice = (
   message: NoticeContent,
   ...extras: NoticeExtra[]
 ): number => {
-  const id = nextId++
   const { params, raw, duration } = parseNoticeExtras(extras)
   const effectiveDuration = resolveDuration(type, duration)
+  const normalizedMessage = normalizeNoticeMessage(message, params, raw)
+  const signature = getNoticeSignature(type, normalizedMessage)
+  const duplicate = signature
+    ? notices.find((candidate) => candidate.signature === signature)
+    : undefined
+
+  if (duplicate) {
+    if (duplicate.timerId) clearTimeout(duplicate.timerId)
+    const timerId =
+      effectiveDuration > 0
+        ? setTimeout(() => hideNotice(duplicate.id), effectiveDuration)
+        : undefined
+    notices = notices.map((candidate) =>
+      candidate.id === duplicate.id
+        ? { ...candidate, timerId, duration: effectiveDuration }
+        : candidate,
+    )
+    notifySubscribers()
+    return duplicate.id
+  }
+
+  const id = nextId++
   const timerId =
     effectiveDuration > 0
       ? setTimeout(() => hideNotice(id), effectiveDuration)
       : undefined
-
-  const normalizedMessage = normalizeNoticeMessage(message, params, raw)
   const notice = buildNotice(
     id,
     type,
     effectiveDuration,
     normalizedMessage,
     timerId,
+    signature,
   )
 
-  notices = [...notices, notice]
+  const overflow = notices.slice(
+    0,
+    Math.max(notices.length + 1 - MAX_VISIBLE_NOTICES, 0),
+  )
+  overflow.forEach((candidate) => {
+    if (candidate.timerId) clearTimeout(candidate.timerId)
+  })
+  notices = [...notices.slice(overflow.length), notice]
   notifySubscribers()
   return id
 }

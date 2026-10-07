@@ -138,16 +138,13 @@
       "subtitle": "Choose a route, then connect",
       "wechat": "WeChat PewPew_VPN",
       "about": "About",
-      "preferences": "Preferences"
-    },
-    "switch": {
-      "currentRouteEmpty": "Current route: Select a route",
-      "currentRoute": "Current route: {{name}}",
-      "currentRouteWithDelay": "Current route: {{name}} · {{delay}}"
+      "preferences": "Preferences",
+      "copyWechat": "Copy WeChat ID",
+      "wechatCopied": "WeChat ID PewPew_VPN copied"
     },
     "account": {
       "title": "Account",
-      "remainingTraffic": "Data remaining",
+      "remainingTraffic": "Data left",
       "nextReset": "Next reset",
       "expire": "Expires",
       "unavailable": "Not available",
@@ -157,9 +154,49 @@
       "dataExhaustedShort": "Data used up. Please renew.",
       "dataExhaustedContinue": "Data used up. Please renew to continue.",
       "expiringSoon": "Your plan expires soon. Please renew.",
-      "expired": "Your plan has expired. Please renew to continue.",
       "lowData": "Data is running low.",
-      "dataExhausted": "Data is used up. Please renew."
+      "daysLeft": "Days left: {{count}}",
+      "usedOfTotal": "{{used}} of {{total}} used",
+      "usage": "Data usage",
+      "contactSupport": "Copy support WeChat to renew",
+      "renewHint": "After renewing, click Update Routes below to refresh your plan."
+    },
+    "compatibility": {
+      "mode": "Connection method",
+      "standard": "Standard",
+      "enhanced": "Enhanced",
+      "switching": "Switching...",
+      "incomplete": "Enhanced connection not ready",
+      "permissionTitle": "Allow enhanced connectivity?",
+      "permissionBody": "Allow PewPew Cloud Client to install or use its background service and route application traffic? Your system may request administrator permission. Switching may briefly interrupt connections.",
+      "allow": "Allow",
+      "changeFailed": "Switching did not complete. Check system permission or try again.",
+      "serviceConflict": "Another client's background service was detected. Enhanced mode was not enabled. Contact support.",
+      "rollbackFailed": "The connection could not be fully restored. Use Repair Network or contact support.",
+      "udpUnsupported": "UDP is disabled on this route. Voice may not connect. Try another route.",
+      "check": "Check Connection",
+      "checking": "Checking",
+      "checkFailed": "Unable to read connection status. Try again.",
+      "core": "Connection core",
+      "systemProxy": "System proxy",
+      "service": "PewPew Background Service",
+      "active": "Enabled",
+      "inactive": "Disabled",
+      "udp": "Route UDP capability",
+      "supported": "Declared support",
+      "unsupported": "Disabled",
+      "unknown": "Unknown",
+      "voice": "Voice connectivity",
+      "notTested": "Not tested",
+      "standardHint": "Works for browsers and most apps",
+      "enhancedHint": "For games, Discord voice and apps that ignore the system proxy. Needs permission the first time.",
+      "serviceUnavailable": "The background service isn't ready. Enhanced mode needs system permission. Please try again.",
+      "switchToEnhanced": "Switch to Enhanced",
+      "summaryCoreDown": "The connection core isn't running. Use Repair Network or restart the client.",
+      "summaryEnhancedActive": "Enhanced routing is enabled. Test your game or voice connection to confirm.",
+      "summaryEnhancedMissing": "The system proxy is on, but enhanced routing isn't active. Reconnect or use Repair Network.",
+      "summaryStandardActive": "Standard connection is active. If games or voice don't connect, switch to Enhanced.",
+      "summaryDisconnected": "Not connected"
     },
     "connectionStatus": {
       "title": "Connection Status",
@@ -175,22 +212,28 @@
       "disconnectFailed": "Disconnect failed. Please try again.",
       "repairNetwork": "Repair Network",
       "repairSuccess": "Network restored. Please reconnect.",
-      "repairFailed": "Repair failed. Please contact support."
+      "repairFailed": "Repair failed. Please contact support.",
+      "loading": "Loading routes…",
+      "updatingRoutes": "Updating routes…",
+      "coreUnavailable": "The connection core isn't running. Use Repair Network or restart the client.",
+      "verificationFailed": "The connection settings didn't take effect. Try again or use Repair Network."
     },
     "connection": {
-      "title": "Connection",
       "route": "Route",
       "mode": "Mode",
       "selectRoute": "Select a route",
       "importFirst": "No available route. Import routes first.",
       "noAvailableRoutes": "No available routes. Update routes or contact support.",
       "smartMode": "Smart Mode",
-      "recommended": "Recommended",
-      "recommendedShort": "Rec.",
-      "smartModeDescription": "Automatically selects the right connection",
+      "smartModeDescription": "Splits traffic using your subscription's rules (recommended)",
       "globalMode": "Global Mode",
-      "globalModeDescription": "Uses the selected route for all connections",
-      "routeChangeFailed": "Route change failed. Please try again or contact support."
+      "globalModeDescription": "Sends all traffic through the selected route",
+      "routeChangeFailed": "Route change failed. Please try again or contact support.",
+      "directMode": "Direct Mode",
+      "directModeHint": "Direct mode is on (possibly set from the tray), so traffic skips the route. Pick a mode above to switch back.",
+      "modeChangeFailed": "Couldn't switch mode. Please try again.",
+      "directModeActive": "Direct mode: traffic skips the route",
+      "directModeBeforeConnect": "Direct mode is on. Connecting will switch to Smart Mode."
     },
     "delay": {
       "testing": "Testing",
@@ -202,14 +245,12 @@
       "title": "Route Subscription",
       "subscriptionLink": "Subscription Link",
       "localFile": "Local Config File",
-      "description": "Paste a link to import or update routes",
       "placeholder": "Paste subscription link",
       "import": "Import Routes",
       "update": "Update Routes",
       "importYaml": "Import YAML File",
       "yamlSupport": "Supports .yaml / .yml config files",
       "dropYaml": "Drop a YAML file here to import",
-      "orImportYaml": "Or click Import YAML File",
       "yamlImporting": "Importing YAML file...",
       "yamlSuccess": "YAML file imported. Select a route and connect.",
       "yamlFailed": "YAML import failed. Check the file format.",
@@ -229,14 +270,15 @@
       "importFailed": "Import failed. Check the subscription link or contact support.",
       "updateFailed": "Update failed. Check the subscription link or contact support.",
       "temporarilyStopped": "Temporarily disconnected. Updating routes.",
-      "autoUpdateFailed": "Auto update failed. You can update manually."
+      "autoUpdateFailed": "Auto update failed. You can update manually.",
+      "changeLink": "Change subscription"
     },
     "onboarding": {
-      "title": "Get started with PewPew Cloud",
+      "title": "Import routes to get started",
       "stepPaste": "Paste your subscription link",
       "stepImport": "Import routes",
       "stepConnect": "Select a route and connect",
-      "importRoutes": "Import routes"
+      "description": "Paste your PewPew Cloud subscription link, or import a YAML config file."
     },
     "diagnostics": {
       "copy": "Copy Diagnostics",
@@ -250,16 +292,15 @@
       "light": "Light",
       "dark": "Dark",
       "language": "Language",
-      "simplifiedChinese": "Simplified Chinese",
-      "english": "English",
       "startup": "Startup",
       "autoLaunch": "Start the client at login",
       "silentStart": "Start minimized to tray",
       "autoUpdateRoutesOnStartup": "Update routes on startup",
-      "autoStartPewPew": "Connect automatically after startup",
-      "safety": "Safety",
-      "autoCloseOnQuit": "Disconnect when quitting",
-      "saveFailed": "Failed to save settings. Please try again."
+      "saveFailed": "Failed to save settings. Please try again.",
+      "connection": "Connection",
+      "autoCloseConnections": "Close old connections when switching routes",
+      "autoCloseConnectionsHint": "Open connections move to the new route right away after you change routes or modes.",
+      "restoreHint": "If you quit while connected, the connection is restored the next time the client starts."
     },
     "about": {
       "title": "About / Open Source Licenses",
@@ -269,7 +310,14 @@
       "licenseTitle": "Open Source License",
       "credits": "Credits",
       "support": "WeChat: PewPew_VPN",
-      "close": "Close"
+      "close": "Close",
+      "version": "Version {{version}}"
+    },
+    "route": {
+      "autoSelected": "No valid route was selected, so {{name}} was chosen.",
+      "noneSelected": "No route selected yet. One will be chosen when you connect.",
+      "invalidWhileConnected": "No valid route is selected. Pick a route from the list.",
+      "switchedToSmart": "Direct mode skips the routes, so Smart Mode was turned on."
     }
   }
 }

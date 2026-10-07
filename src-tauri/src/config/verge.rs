@@ -85,6 +85,9 @@ pub struct IVerge {
     /// clash tun mode
     pub enable_tun_mode: Option<bool>,
 
+    pub pewpew_enhanced_mode: Option<bool>,
+    pub pewpew_enhanced_accepted: Option<bool>,
+
     /// can the app auto startup
     pub enable_auto_launch: Option<bool>,
 
@@ -495,6 +498,8 @@ impl IVerge {
         patch!(tun_tray_icon);
 
         patch!(enable_tun_mode);
+        patch!(pewpew_enhanced_mode);
+        patch!(pewpew_enhanced_accepted);
         patch!(enable_auto_launch);
         patch!(enable_silent_start);
         patch!(enable_hover_jump_navigator);

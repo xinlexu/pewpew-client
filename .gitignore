@@ -28,6 +28,7 @@ CLAUDE.md
 .vfox.toml
 .vfox/
 .claude
+/Claude outputs/
 AGENTS.md
 *.p12
 *.pfx

@@ -1,24 +1,42 @@
-import { Box, Chip, Stack, Typography, alpha, useTheme } from '@mui/material'
-import { useLockFn } from 'ahooks'
+import { InfoOutlined } from '@mui/icons-material'
+import {
+  Box,
+  CircularProgress,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+} from '@mui/material'
+import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
+import {
+  sectionLabelSx,
+  segmentedControlSx,
+  toneTextColor,
+} from '@/components/home/pewpew-ui'
+import { useRouteGuard } from '@/hooks/use-route-guard'
 import { useVerge } from '@/hooks/use-verge'
 import {
   useAppRefreshers,
   useClashConfigData,
+  useProxiesData,
 } from '@/providers/app-data-context'
 import { patchClashMode } from '@/services/cmds'
+import { showNotice } from '@/services/notice-service'
+import { resolvePewPewProxyGroup } from '@/utils/pewpew-client'
 
 const CLASH_MODES = ['rule', 'global', 'direct'] as const
 type ClashMode = (typeof CLASH_MODES)[number]
-const VISIBLE_CLASH_MODES: ClashMode[] = ['rule', 'global']
+const VISIBLE_CLASH_MODES = ['rule', 'global'] as const
+type VisibleClashMode = (typeof VISIBLE_CLASH_MODES)[number]
 
 const isClashMode = (mode: string): mode is ClashMode =>
   (CLASH_MODES as readonly string[]).includes(mode)
 
 const MODE_META: Record<
-  ClashMode,
+  VisibleClashMode,
   { labelKey: string; descriptionKey: string }
 > = {
   rule: {
@@ -29,21 +47,46 @@ const MODE_META: Record<
     labelKey: 'home.pewpew.connection.globalMode',
     descriptionKey: 'home.pewpew.connection.globalModeDescription',
   },
-  direct: {
-    labelKey: 'home.components.clashMode.labels.direct',
-    descriptionKey: 'home.components.clashMode.descriptions.direct',
-  },
 }
 
-export const ClashModeCard = () => {
-  const theme = useTheme()
-  const { i18n, t } = useTranslation()
+interface ClashModeCardProps {
+  disabled?: boolean
+}
+
+export const ClashModeCard = ({ disabled = false }: ClashModeCardProps) => {
+  const { t } = useTranslation()
   const { verge } = useVerge()
   const { clashConfig } = useClashConfigData()
+  const { proxies } = useProxiesData()
   const { refreshClashConfig } = useAppRefreshers()
-
-  // 支持的模式列表
-  const modeList = VISIBLE_CLASH_MODES
+  const { ensureValidRoute } = useRouteGuard()
+  const {
+    mutateAsync: onChangeMode,
+    isPending,
+    variables,
+  } = useMutation({
+    mutationKey: ['pewpewRoutes', 'mode'],
+    mutationFn: async (mode: VisibleClashMode) => {
+      const preferred = resolvePewPewProxyGroup(
+        proxies,
+        clashConfig?.mode,
+      ).currentName
+      try {
+        // Prepare the target group before making it carry live traffic.
+        if (!(await ensureValidRoute({ mode, preferred }))) return
+        await patchClashMode(mode)
+        if (verge?.auto_close_connection) {
+          await closeAllConnections().catch(() => {})
+        }
+      } catch (error) {
+        console.error('Failed to change mode:', error)
+        showNotice.error(t('home.pewpew.connection.modeChangeFailed'))
+      } finally {
+        await refreshClashConfig().catch(() => {})
+      }
+    },
+  })
+  const pendingMode = isPending ? variables : null
 
   // 直接使用API返回的模式，不维护本地状态
   const currentMode = clashConfig?.mode?.toLowerCase()
@@ -52,145 +95,68 @@ export const ClashModeCard = () => {
       ? currentMode
       : undefined
   const visibleModeKey =
-    currentModeKey === 'direct' ? undefined : currentModeKey
-
-  // 切换模式的处理函数
-  const onChangeMode = useLockFn(async (mode: ClashMode) => {
-    if (mode === currentModeKey) return
-    if (verge?.auto_close_connection) {
-      closeAllConnections()
-    }
-
-    try {
-      await patchClashMode(mode)
-      // 使用共享的刷新方法
-      refreshClashConfig()
-    } catch (error) {
-      console.error('Failed to change mode:', error)
-    }
-  })
-
-  // 按钮样式
-  const buttonStyles = (mode: ClashMode) => ({
-    cursor: 'pointer',
-    px: 1.35,
-    py: 1.15,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    justifyContent: 'center',
-    gap: 0.6,
-    minHeight: 90,
-    minWidth: 0,
-    boxSizing: 'border-box',
-    bgcolor:
-      mode === visibleModeKey
-        ? 'primary.main'
-        : alpha(theme.palette.primary.main, 0.055),
-    color: mode === visibleModeKey ? 'primary.contrastText' : 'text.primary',
-    border: `1px solid ${
-      mode === visibleModeKey
-        ? alpha(theme.palette.primary.main, 0.1)
-        : alpha(theme.palette.primary.main, 0.08)
-    }`,
-    borderRadius: 3,
-    position: 'relative',
-    overflow: 'hidden',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      bgcolor:
-        mode === visibleModeKey
-          ? 'primary.dark'
-          : alpha(theme.palette.primary.main, 0.09),
-    },
-    '&:active': {
-      transform: 'translateY(1px)',
-    },
-  })
+    currentModeKey === 'direct' ? null : (currentModeKey ?? null)
+  const shownMode = pendingMode ?? visibleModeKey
 
   return (
-    <Stack spacing={1.25} sx={{ width: '100%', minWidth: 0 }}>
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-          gap: 1,
-          width: '100%',
-          minWidth: 0,
-        }}
+    <Box sx={{ width: '100%', minWidth: 0 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: 'center', mb: 0.75, minHeight: 22 }}
       >
-        {modeList.map((mode) => (
-          <Box
-            key={mode}
-            role="button"
-            aria-pressed={mode === visibleModeKey}
-            tabIndex={0}
-            onClick={() => onChangeMode(mode)}
-            sx={buttonStyles(mode)}
-          >
-            <Box
-              sx={{
-                minWidth: 0,
-                pr: mode === 'rule' ? 5.5 : 0,
-                textAlign: 'left',
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 900,
-                  lineHeight: 1.2,
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                {t(MODE_META[mode].labelKey)}
-              </Typography>
-              {mode === 'rule' && (
-                <Chip
-                  size="small"
-                  label={
-                    i18n.language === 'en'
-                      ? t('home.pewpew.connection.recommendedShort')
-                      : t('home.pewpew.connection.recommended')
-                  }
-                  sx={{
-                    position: 'absolute',
-                    top: 10,
-                    right: 10,
-                    height: 20,
-                    fontSize: 11,
-                    maxWidth: 64,
-                    bgcolor:
-                      mode === visibleModeKey
-                        ? alpha(theme.palette.common.white, 0.18)
-                        : alpha(theme.palette.success.main, 0.12),
-                    color:
-                      mode === visibleModeKey
-                        ? 'inherit'
-                        : theme.palette.success.main,
-                    '& .MuiChip-label': {
-                      px: 0.75,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    },
-                  }}
-                />
-              )}
-            </Box>
-            <Typography
-              variant="caption"
-              sx={{
-                opacity: mode === visibleModeKey ? 0.9 : 0.72,
-                textAlign: 'left',
-                lineHeight: 1.32,
-                overflowWrap: 'anywhere',
-              }}
-            >
-              {t(MODE_META[mode].descriptionKey)}
-            </Typography>
-          </Box>
+        <Typography variant="body2" sx={sectionLabelSx}>
+          {t('home.pewpew.connection.mode')}
+        </Typography>
+        {pendingMode && <CircularProgress size={12} thickness={5} />}
+      </Stack>
+      <ToggleButtonGroup
+        exclusive
+        fullWidth
+        size="small"
+        value={shownMode}
+        disabled={disabled || !!pendingMode || !currentModeKey}
+        aria-label={t('home.pewpew.connection.mode')}
+        onChange={(_, value: VisibleClashMode | null) => {
+          if (value && value !== currentModeKey && !disabled && !isPending) {
+            void onChangeMode(value)
+          }
+        }}
+        sx={segmentedControlSx}
+      >
+        {VISIBLE_CLASH_MODES.map((mode) => (
+          <ToggleButton key={mode} value={mode}>
+            {t(MODE_META[mode].labelKey)}
+          </ToggleButton>
         ))}
-      </Box>
-    </Stack>
+      </ToggleButtonGroup>
+      {currentModeKey === 'direct' ? (
+        <Stack
+          direction="row"
+          spacing={0.75}
+          sx={(theme) => ({
+            mt: 0.75,
+            alignItems: 'flex-start',
+            color: toneTextColor(theme, 'warning'),
+          })}
+        >
+          <InfoOutlined sx={{ fontSize: 16, mt: '1px' }} />
+          <Typography variant="caption" sx={{ lineHeight: 1.45 }}>
+            {t('home.pewpew.connection.directModeHint')}
+          </Typography>
+        </Stack>
+      ) : (
+        shownMode && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            component="p"
+            sx={{ mt: 0.75, lineHeight: 1.45 }}
+          >
+            {t(MODE_META[shownMode].descriptionKey)}
+          </Typography>
+        )
+      )}
+    </Box>
   )
 }

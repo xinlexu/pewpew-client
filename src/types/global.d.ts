@@ -890,6 +890,8 @@ interface IProxyConfig
 }
 
 interface IVergeConfig {
+  pewpew_enhanced_mode?: boolean
+  pewpew_enhanced_accepted?: boolean
   app_log_level?: 'trace' | 'debug' | 'info' | 'warn' | 'error' | string
   app_log_max_size?: number // KB
   app_log_max_count?: number
