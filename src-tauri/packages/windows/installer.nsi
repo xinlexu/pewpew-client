@@ -76,6 +76,7 @@ Var VC_REDIST_URL
 Var VC_REDIST_EXE
 Var VC_RUNTIME_READY
 Var VC_RUNTIME_NEEDED
+Var PewPewBlockedFile
 
 Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
@@ -461,6 +462,10 @@ FunctionEnd
   !include "{{this}}"
 {{/each}}
 
+LangString pewpewFilesBusy ${LANG_ENGLISH} "PewPew Cloud could not release an installation file. Exit the old client and retry. If this continues, cancel setup, restart Windows, and install before opening the client. No installation files have been replaced.$\r$\n$\r$\n$PewPewBlockedFile"
+LangString pewpewFilesBusy ${LANG_SIMPCHINESE} "安装文件仍被占用或无法写入。请退出旧版 PewPew 云后重试；若仍失败，请取消安装，重启电脑后先安装、再打开客户端。尚未替换安装文件。$\r$\n$\r$\n$PewPewBlockedFile"
+LangString pewpewFilesBusy ${LANG_RUSSIAN} "Не удалось освободить файл установки PewPew Cloud. Закройте старый клиент и повторите попытку. Если ошибка повторится, отмените установку, перезагрузите Windows и установите клиент до его запуска. Файлы установки ещё не заменены.$\r$\n$\r$\n$PewPewBlockedFile"
+
 Function .onInit
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
@@ -548,6 +553,13 @@ FunctionEnd
     !else
       SimpleSC::StopService "clash_verge_service" 1 30
       Pop $0
+      !if "${ACTION}" == "stop"
+        ${If} $0 != 0
+        ${AndIf} $0 != 1060
+        ${AndIf} $0 != 1062
+          StrCpy $PewPewBlockedFile "$INSTDIR\resources\clash-verge-service.exe ($0)"
+        ${EndIf}
+      !endif
       !if "${ACTION}" == "remove"
         SimpleSC::RemoveService "clash_verge_service"
         Pop $0
@@ -555,6 +567,107 @@ FunctionEnd
     !endif
   ${EndIf}
 !macroend
+
+!macro PewPewStopOwnCores
+  Push $0
+  Push $1
+  Push $2
+  Push $3
+  Push $4
+  Push $5
+  Push $6
+  Push $7
+  Push $8
+  Push $9
+  GetFullPathName $8 "$INSTDIR\verge-mihomo.exe"
+  GetFullPathName $9 "$INSTDIR\verge-mihomo-alpha.exe"
+  System::Call 'kernel32::CreateToolhelp32Snapshot(i 2, i 0) p.r0'
+  ${If} $0 P<> -1
+    ; PROCESSENTRY32W is 556 bytes in the 32-bit NSIS installer, including on x64 Windows.
+    System::Alloc 556
+    Pop $1
+    ${If} $1 P<> 0
+      System::Call '*$1(i 556)'
+      System::Call 'kernel32::Process32FirstW(p r0, p r1) i.r2'
+      ${While} $2 <> 0
+        System::Call '*$1(i, i, i .r3)'
+        ; Query and terminate through the same handle so a recycled PID cannot target another process.
+        System::Call 'kernel32::OpenProcess(i 0x101001, i 0, i r3) p.r4'
+        ${If} $4 P<> 0
+          StrCpy $6 ${NSIS_MAX_STRLEN}
+          System::Call 'kernel32::QueryFullProcessImageNameW(p r4, i 0, w .r5, *i r6) i.r7'
+          ${If} $7 <> 0
+            GetFullPathName $5 $5
+            ${If} $5 == $8
+            ${OrIf} $5 == $9
+              System::Call 'kernel32::TerminateProcess(p r4, i 0) i.r7'
+              System::Call 'kernel32::WaitForSingleObject(p r4, i 10000) i.r7'
+            ${EndIf}
+          ${EndIf}
+          System::Call 'kernel32::CloseHandle(p r4)'
+        ${EndIf}
+        System::Call 'kernel32::Process32NextW(p r0, p r1) i.r2'
+      ${EndWhile}
+      System::Free $1
+    ${EndIf}
+    System::Call 'kernel32::CloseHandle(p r0)'
+  ${EndIf}
+  Pop $9
+  Pop $8
+  Pop $7
+  Pop $6
+  Pop $5
+  Pop $4
+  Pop $3
+  Pop $2
+  Pop $1
+  Pop $0
+!macroend
+
+!macro PewPewCheckWritable FILE
+  ${If} $PewPewBlockedFile == ""
+  ${AndIf} ${FileExists} "${FILE}"
+    Push $0
+    Push $1
+    ; OPEN_EXISTING checks write access without truncating or changing the old file.
+    System::Call 'kernel32::CreateFileW(w "${FILE}", i 0x40000000, i 7, p 0, i 3, i 0x80, p 0) p.r0'
+    ${If} $0 P= -1
+      System::Call 'kernel32::GetLastError() i.r1'
+      StrCpy $PewPewBlockedFile "${FILE} ($1)"
+    ${Else}
+      System::Call 'kernel32::CloseHandle(p r0)'
+    ${EndIf}
+    Pop $1
+    Pop $0
+  ${EndIf}
+!macroend
+
+!macro PewPewPrepareFiles PREFIX
+Function ${PREFIX}PewPewPrepareFiles
+  retry_prepare:
+    StrCpy $PewPewBlockedFile ""
+    !insertmacro PewPewServiceAction "stop"
+    ${If} $PewPewBlockedFile == ""
+      !insertmacro PewPewStopOwnCores
+      !insertmacro PewPewCheckWritable "$INSTDIR\${MAINBINARYNAME}.exe"
+      {{#each resources}}
+        !insertmacro PewPewCheckWritable "$INSTDIR\\{{this.[1]}}"
+      {{/each}}
+      {{#each binaries}}
+        !insertmacro PewPewCheckWritable "$INSTDIR\\{{this}}"
+      {{/each}}
+    ${EndIf}
+    ${If} $PewPewBlockedFile != ""
+      DetailPrint "$(pewpewFilesBusy)"
+      MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "$(pewpewFilesBusy)" /SD IDCANCEL IDRETRY retry_prepare
+      SetErrorLevel 2
+      Abort
+    ${EndIf}
+FunctionEnd
+!macroend
+
+!insertmacro PewPewPrepareFiles ""
+!insertmacro PewPewPrepareFiles "un."
 
 Section EarlyChecks
   ; Abort silent installer if downgrades is disabled
@@ -760,7 +873,7 @@ Section Install
   !endif
 
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
-  !insertmacro PewPewServiceAction "stop"
+  Call PewPewPrepareFiles
 
   ; Ensure startup folders exist
   CreateDirectory "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup"
@@ -911,7 +1024,7 @@ Section Uninstall
   !endif
 
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
-  !insertmacro PewPewServiceAction "stop"
+  Call un.PewPewPrepareFiles
   !insertmacro PewPewServiceAction "remove"
 
   !insertmacro SetContext
