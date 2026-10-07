@@ -77,6 +77,113 @@ Var VC_REDIST_EXE
 Var VC_RUNTIME_READY
 Var VC_RUNTIME_NEEDED
 Var PewPewBlockedFile
+Var PewPewLogFile
+Var PewPewRestartService
+Var PewPewCoreCount
+Var PewPewProcessCount
+Var PewPewFlushError
+
+; Setup log next to the client logs (%APPDATA%\<bundle id>\logs\installer.log).
+; Every line is flushed to disk, so the last stage reached survives a forced power-off.
+!macro PewPewInitLog
+  SetShellVarContext current
+  StrCpy $PewPewLogFile "$APPDATA\${BUNDLEID}\logs\installer.log"
+!macroend
+
+!macro PewPewLog TEXT
+  !ifdef __UNINSTALL__
+    Push `uninstall ${VERSION}: ${TEXT}`
+    Call un.PewPewWriteLog
+  !else
+    Push `setup ${VERSION}: ${TEXT}`
+    Call PewPewWriteLog
+  !endif
+!macroend
+
+!macro PewPewWriteLogFunction PREFIX
+Function ${PREFIX}PewPewWriteLog
+  Exch $R0
+  Push $R1
+  Push $R2
+  Push $R3
+  Push $R4
+  Push $R5
+  Push $R6
+  Push $R7
+  Push $R8
+  ${If} $PewPewLogFile != ""
+    ${GetParent} "$PewPewLogFile" $R1
+    CreateDirectory "$R1"
+    ClearErrors
+    FileOpen $R8 "$PewPewLogFile" a
+    ${IfNot} ${Errors}
+      FileSeek $R8 0 END $R1
+      ${If} $R1 > 1048576
+        FileClose $R8
+        Delete "$PewPewLogFile.old"
+        Rename "$PewPewLogFile" "$PewPewLogFile.old"
+        ClearErrors
+        FileOpen $R8 "$PewPewLogFile" w
+        StrCpy $R1 0
+      ${EndIf}
+      ${IfNot} ${Errors}
+        ${If} $R1 = 0
+          FileWriteUTF16LE /BOM $R8 ""
+        ${EndIf}
+        ${GetTime} "" "L" $R1 $R2 $R3 $R4 $R5 $R6 $R7
+        FileWriteUTF16LE $R8 "$R3-$R2-$R1 $R5:$R6:$R7 $R0$\r$\n"
+        System::Call 'kernel32::FlushFileBuffers(p R8)'
+        FileClose $R8
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
+  Pop $R8
+  Pop $R7
+  Pop $R6
+  Pop $R5
+  Pop $R4
+  Pop $R3
+  Pop $R2
+  Pop $R1
+  Pop $R0
+FunctionEnd
+!macroend
+
+!insertmacro PewPewWriteLogFunction ""
+!insertmacro PewPewWriteLogFunction "un."
+
+; Counts running processes by executable name from a process snapshot. No process
+; handle is opened, so unrelated and protected processes are never touched.
+!macro PewPewCountProcesses NAME
+  Push $0
+  Push $1
+  Push $2
+  Push $3
+  StrCpy $PewPewProcessCount 0
+  System::Call 'kernel32::CreateToolhelp32Snapshot(i 2, i 0) p.r0'
+  ${If} $0 P<> -1
+    ; PROCESSENTRY32W is 556 bytes in the 32-bit NSIS installer, including on x64 Windows.
+    System::Alloc 556
+    Pop $1
+    ${If} $1 P<> 0
+      System::Call '*$1(i 556)'
+      System::Call 'kernel32::Process32FirstW(p r0, p r1) i.r2'
+      ${While} $2 <> 0
+        System::Call '*$1(i, i, i, i, i, i, i, i, i, &w260 .r3)'
+        ${If} $3 == "${NAME}"
+          IntOp $PewPewProcessCount $PewPewProcessCount + 1
+        ${EndIf}
+        System::Call 'kernel32::Process32NextW(p r0, p r1) i.r2'
+      ${EndWhile}
+      System::Free $1
+    ${EndIf}
+    System::Call 'kernel32::CloseHandle(p r0)'
+  ${EndIf}
+  Pop $3
+  Pop $2
+  Pop $1
+  Pop $0
+!macroend
 
 Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
@@ -333,11 +440,19 @@ Function PageLeaveReinstall
   ${EndIf}
 
   reinst_uninstall:
+    ; The previous uninstaller terminates a running client; ask for a clean exit first.
+    Call PewPewWaitForClientExit
+    Pop $R5
+    ${If} $R5 <> 0
+      !insertmacro PewPewLog "previous version not removed: the client is still running"
+      Abort
+    ${EndIf}
     HideWindow
     ClearErrors
 
     ${If} $WixMode = 1
       ReadRegStr $R1 HKLM "$R6" "UninstallString"
+      !insertmacro PewPewLog "running previous MSI uninstaller: $R1"
       ExecWait '$R1' $0
     ${Else}
       ReadRegStr $4 SHCTX "${MANUPRODUCTKEY}" ""
@@ -345,12 +460,14 @@ Function PageLeaveReinstall
       ${IfThen} $UpdateMode = 1 ${|} StrCpy $R1 "$R1 /UPDATE" ${|} ; append /UPDATE
       ${IfThen} $PassiveMode = 1 ${|} StrCpy $R1 "$R1 /P" ${|} ; append /P
       StrCpy $R1 "$R1 _?=$4" ; append uninstall directory
+      !insertmacro PewPewLog "running previous uninstaller: $R1"
       ExecWait '$R1' $0
     ${EndIf}
 
     BringToFront
 
     ${IfThen} ${Errors} ${|} StrCpy $0 2 ${|} ; ExecWait failed, set fake exit code
+    !insertmacro PewPewLog "previous uninstaller exit code $0"
 
     ${If} $0 <> 0
     ${OrIf} ${FileExists} "$INSTDIR\${MAINBINARYNAME}.exe"
@@ -370,6 +487,7 @@ Function PageLeaveReinstall
       Abort
     ${EndIf}
   reinst_done:
+    !insertmacro PewPewLog "continuing over the existing installation"
 FunctionEnd
 
 ; 5. Choose install directory page
@@ -405,6 +523,7 @@ Var AppStartMenuFolder
 !insertmacro MUI_PAGE_FINISH
 
 Function RunMainBinary
+  !insertmacro PewPewLog "launching the client from the finish page"
   nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" ""
 FunctionEnd
 
@@ -466,6 +585,69 @@ LangString pewpewFilesBusy ${LANG_ENGLISH} "PewPew Cloud could not release an in
 LangString pewpewFilesBusy ${LANG_SIMPCHINESE} "安装文件仍被占用或无法写入。请退出旧版 PewPew 云后重试；若仍失败，请取消安装，重启电脑后先安装、再打开客户端。尚未替换安装文件。$\r$\n$\r$\n$PewPewBlockedFile"
 LangString pewpewFilesBusy ${LANG_RUSSIAN} "Не удалось освободить файл установки PewPew Cloud. Закройте старый клиент и повторите попытку. Если ошибка повторится, отмените установку, перезагрузите Windows и установите клиент до его запуска. Файлы установки ещё не заменены.$\r$\n$\r$\n$PewPewBlockedFile"
 
+LangString pewpewClientRunning ${LANG_ENGLISH} "PewPew Cloud is still running. Disconnect in the client, choose Exit from its tray icon menu, then click Retry.$\r$\n$\r$\nSetup does not force the client to close, so that the connection can shut down cleanly. If the client is not responding, cancel setup, restart Windows, and run setup before opening the client."
+LangString pewpewClientRunning ${LANG_SIMPCHINESE} "PewPew 云客户端仍在运行。请先在客户端中断开连接，再从任务栏托盘图标菜单中选择“退出”，然后点击“重试”。$\r$\n$\r$\n安装程序不会强制结束客户端，以便连接正常关闭。若客户端没有响应，请取消安装，重启电脑后先运行安装程序、再打开客户端。"
+LangString pewpewClientRunning ${LANG_RUSSIAN} "PewPew Cloud всё ещё работает. Отключитесь в клиенте, выберите «Выход» в меню значка в области уведомлений и нажмите «Повторить».$\r$\n$\r$\nУстановщик не завершает клиент принудительно, чтобы соединение закрылось корректно. Если клиент не отвечает, отмените установку, перезагрузите Windows и запустите установщик до открытия клиента."
+LangString pewpewClientRunningAbort ${LANG_ENGLISH} "PewPew Cloud is still running. Exit it from its tray icon menu and run setup again."
+LangString pewpewClientRunningAbort ${LANG_SIMPCHINESE} "PewPew 云客户端仍在运行。请从托盘图标菜单退出客户端后重新运行安装程序。"
+LangString pewpewClientRunningAbort ${LANG_RUSSIAN} "PewPew Cloud всё ещё работает. Закройте его через меню значка в области уведомлений и снова запустите установщик."
+LangString pewpewFlushFailed ${LANG_ENGLISH} "Setup could not confirm that these installed files were written to disk:$\r$\n$PewPewFlushError$\r$\n$\r$\nClick Retry to try again. If it still fails, cancel setup, restart Windows, and run setup again before opening the client."
+LangString pewpewFlushFailed ${LANG_SIMPCHINESE} "安装程序无法确认以下文件已写入磁盘：$\r$\n$PewPewFlushError$\r$\n$\r$\n请点击“重试”。若仍失败，请取消安装，重启电脑后重新运行安装程序，在此之前不要打开客户端。"
+LangString pewpewFlushFailed ${LANG_RUSSIAN} "Установщику не удалось убедиться, что эти файлы записаны на диск:$\r$\n$PewPewFlushError$\r$\n$\r$\nНажмите «Повторить». Если ошибка повторится, отмените установку, перезагрузите Windows и снова запустите установщик до открытия клиента."
+
+; Waits until the client has exited by itself. Its own exit turns TUN off and
+; stops the connection core cleanly; Tauri's CheckIfAppIsRunning would terminate
+; it instead. Pushes 0 when no client is running, 1 when it is still running.
+!macro PewPewClientExitFunction PREFIX
+Function ${PREFIX}PewPewWaitForClientExit
+  Push $0
+  Push $1
+  Push $2
+  StrCpy $0 0
+  StrCpy $1 10
+  ${If} ${Silent}
+  ${OrIf} $PassiveMode = 1
+    StrCpy $1 40
+  ${EndIf}
+  StrCpy $2 0
+  check_client:
+    !insertmacro PewPewCountProcesses "${MAINBINARYNAME}.exe"
+    ${If} $PewPewProcessCount = 0
+      ${If} $2 > 0
+        !insertmacro PewPewLog "client has exited"
+      ${EndIf}
+      StrCpy $0 0
+      Goto client_done
+    ${EndIf}
+    ${If} $2 = 0
+      !insertmacro PewPewLog "client is running ($PewPewProcessCount processes); waiting for it to exit"
+    ${EndIf}
+    ${If} $2 < $1
+      IntOp $2 $2 + 1
+      Sleep 500
+      Goto check_client
+    ${EndIf}
+    StrCpy $0 1
+    ${If} ${Silent}
+    ${OrIf} $PassiveMode = 1
+      Goto client_done
+    ${EndIf}
+    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "$(pewpewClientRunning)" /SD IDCANCEL IDRETRY retry_client
+    Goto client_done
+  retry_client:
+    StrCpy $1 4
+    StrCpy $2 1
+    Goto check_client
+  client_done:
+  Pop $2
+  Pop $1
+  Exch $0
+FunctionEnd
+!macroend
+
+!insertmacro PewPewClientExitFunction ""
+!insertmacro PewPewClientExitFunction "un."
+
 Function .onInit
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
@@ -486,6 +668,7 @@ Function .onInit
     !insertmacro MUI_LANGDLL_DISPLAY
   !endif
 
+  !insertmacro PewPewInitLog
   !insertmacro SetContext
 
   ${If} $INSTDIR == "${PLACEHOLDER_INSTALL_DIR}"
@@ -513,6 +696,14 @@ Function .onInit
   !if "${INSTALLMODE}" == "both"
     !insertmacro MULTIUSER_INIT
   !endif
+
+  ReadRegStr $0 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" "CurrentBuild"
+  ReadRegStr $1 SHCTX "${UNINSTKEY}" "DisplayVersion"
+  StrCpy $2 0
+  ${If} ${Silent}
+    StrCpy $2 1
+  ${EndIf}
+  !insertmacro PewPewLog "started on Windows build $0; installed version '$1'; install dir $INSTDIR; silent=$2 passive=$PassiveMode update=$UpdateMode; command line $CMDLINE"
 FunctionEnd
 
 
@@ -539,20 +730,65 @@ Function CheckVCRuntime64
 FunctionEnd
 
 
+!macro PewPewPlainPath VAR
+  ; Registrations may be quoted or use a `\\?\` path; both name the same file.
+  Push $R8
+  StrCpy $R8 ${VAR} 1
+  ${If} $R8 == '"'
+    StrCpy ${VAR} ${VAR} "" 1
+    StrCpy $R8 ${VAR} "" -1
+    ${If} $R8 == '"'
+      StrCpy ${VAR} ${VAR} -1
+    ${EndIf}
+  ${EndIf}
+  StrCpy $R8 ${VAR} 4
+  ${If} $R8 == "\\?\"
+    StrCpy ${VAR} ${VAR} "" 4
+  ${EndIf}
+  Pop $R8
+!macroend
+
 !macro PewPewServiceAction ACTION
   ; The service identifier is shared with the upstream helper. Only touch our installation.
   SetRegView 64
+  ClearErrors
   ReadRegStr $R9 HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "ImagePath"
-  ${If} $R9 == '$\"$INSTDIR\resources\clash-verge-service.exe$\"'
-  ${OrIf} $R9 == "$INSTDIR\resources\clash-verge-service.exe"
+  !insertmacro PewPewPlainPath $R9
+  ${If} $R9 == "$INSTDIR\resources\clash-verge-service.exe"
     !if "${ACTION}" == "start"
-      WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "DisplayName" "PewPew Background Service"
-      WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "Description" "PewPew Background Service"
-      SimpleSC::StartService "clash_verge_service" "" 30
-      Pop $0
+      ; Restart the service only when it was running idle. A service that still had a
+      ; connection core would restore that core (and TUN) right away during setup.
+      ${If} $PewPewRestartService == "1"
+        WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "DisplayName" "PewPew Background Service"
+        WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "Description" "PewPew Background Service"
+        SimpleSC::StartService "clash_verge_service" "" 30
+        Pop $0
+        !insertmacro PewPewLog "background service start: result $0"
+      ${Else}
+        !insertmacro PewPewLog "background service left stopped; the client starts it when needed"
+      ${EndIf}
     !else
+      SimpleSC::GetServiceStatus "clash_verge_service"
+      Pop $0
+      Pop $1
+      !insertmacro PewPewLog "background service state $1 (query result $0)"
+      !if "${ACTION}" == "stop"
+        ${If} $PewPewRestartService == ""
+          StrCpy $PewPewRestartService "0"
+          ${If} $0 = 0
+          ${AndIf} $1 = 4
+            !insertmacro PewPewOwnCores 0
+            ${If} $PewPewCoreCount = 0
+              StrCpy $PewPewRestartService "1"
+            ${Else}
+              !insertmacro PewPewLog "the service still runs $PewPewCoreCount connection cores; it will not be restarted during setup"
+            ${EndIf}
+          ${EndIf}
+        ${EndIf}
+      !endif
       SimpleSC::StopService "clash_verge_service" 1 30
       Pop $0
+      !insertmacro PewPewLog "background service stop: result $0"
       !if "${ACTION}" == "stop"
         ${If} $0 != 0
         ${AndIf} $0 != 1060
@@ -563,12 +799,21 @@ FunctionEnd
       !if "${ACTION}" == "remove"
         SimpleSC::RemoveService "clash_verge_service"
         Pop $0
+        !insertmacro PewPewLog "background service remove: result $0"
       !endif
     !endif
+  ${Else}
+    !insertmacro PewPewLog "background service ${ACTION} skipped; registered path '$R9'"
   ${EndIf}
 !macroend
 
-!macro PewPewStopOwnCores
+; Finds stable/alpha cores that run from $INSTDIR and counts them in
+; $PewPewCoreCount. Candidates are picked by executable name from the snapshot,
+; so no handle is opened for unrelated processes. A candidate is identified with
+; query rights only; with TERMINATE 1, matching cores are then reopened with
+; terminate rights, checked again so a recycled PID cannot be hit, terminated
+; and waited for. A core that cannot be stopped within 10 s blocks setup.
+!macro PewPewOwnCores TERMINATE
   Push $0
   Push $1
   Push $2
@@ -579,6 +824,7 @@ FunctionEnd
   Push $7
   Push $8
   Push $9
+  StrCpy $PewPewCoreCount 0
   GetFullPathName $8 "$INSTDIR\verge-mihomo.exe"
   GetFullPathName $9 "$INSTDIR\verge-mihomo-alpha.exe"
   System::Call 'kernel32::CreateToolhelp32Snapshot(i 2, i 0) p.r0'
@@ -590,21 +836,53 @@ FunctionEnd
       System::Call '*$1(i 556)'
       System::Call 'kernel32::Process32FirstW(p r0, p r1) i.r2'
       ${While} $2 <> 0
-        System::Call '*$1(i, i, i .r3)'
-        ; Query and terminate through the same handle so a recycled PID cannot target another process.
-        System::Call 'kernel32::OpenProcess(i 0x101001, i 0, i r3) p.r4'
-        ${If} $4 P<> 0
-          StrCpy $6 ${NSIS_MAX_STRLEN}
-          System::Call 'kernel32::QueryFullProcessImageNameW(p r4, i 0, w .r5, *i r6) i.r7'
-          ${If} $7 <> 0
-            GetFullPathName $5 $5
-            ${If} $5 == $8
-            ${OrIf} $5 == $9
-              System::Call 'kernel32::TerminateProcess(p r4, i 0) i.r7'
-              System::Call 'kernel32::WaitForSingleObject(p r4, i 10000) i.r7'
+        System::Call '*$1(i, i, i .r3, i, i, i, i, i, i, &w260 .r5)'
+        ${If} $5 == "verge-mihomo.exe"
+        ${OrIf} $5 == "verge-mihomo-alpha.exe"
+          System::Call 'kernel32::OpenProcess(i 0x1000, i 0, i r3) p.r4'
+          ${If} $4 P<> 0
+            StrCpy $6 ${NSIS_MAX_STRLEN}
+            System::Call 'kernel32::QueryFullProcessImageNameW(p r4, i 0, w .r5, *i r6) i.r7'
+            System::Call 'kernel32::CloseHandle(p r4)'
+            ${If} $7 <> 0
+              GetFullPathName $5 $5
+              ${If} $5 == $8
+              ${OrIf} $5 == $9
+                IntOp $PewPewCoreCount $PewPewCoreCount + 1
+                !if "${TERMINATE}" == "1"
+                  System::Call 'kernel32::OpenProcess(i 0x101001, i 0, i r3) p.r4 ?e'
+                  Pop $7
+                  ${If} $4 P<> 0
+                    StrCpy $6 ${NSIS_MAX_STRLEN}
+                    System::Call 'kernel32::QueryFullProcessImageNameW(p r4, i 0, w .r5, *i r6) i.r7'
+                    StrCpy $6 0
+                    ${If} $7 <> 0
+                      GetFullPathName $5 $5
+                      ${If} $5 == $8
+                      ${OrIf} $5 == $9
+                        StrCpy $6 1
+                      ${EndIf}
+                    ${EndIf}
+                    ${If} $6 = 1
+                      !insertmacro PewPewLog "stopping leftover core pid $3: $5"
+                      System::Call 'kernel32::TerminateProcess(p r4, i 1) i.r7'
+                      System::Call 'kernel32::WaitForSingleObject(p r4, i 10000) i.r7'
+                      ${If} $7 = 0
+                        !insertmacro PewPewLog "core pid $3 exited"
+                      ${Else}
+                        StrCpy $PewPewBlockedFile "$5 (pid $3, wait $7)"
+                        !insertmacro PewPewLog "core pid $3 did not exit within 10 s (wait $7)"
+                      ${EndIf}
+                    ${EndIf}
+                    System::Call 'kernel32::CloseHandle(p r4)'
+                  ${Else}
+                    StrCpy $PewPewBlockedFile "$5 (pid $3, error $7)"
+                    !insertmacro PewPewLog "core pid $3 cannot be stopped by setup (error $7): $5"
+                  ${EndIf}
+                !endif
+              ${EndIf}
             ${EndIf}
           ${EndIf}
-          System::Call 'kernel32::CloseHandle(p r4)'
         ${EndIf}
         System::Call 'kernel32::Process32NextW(p r0, p r1) i.r2'
       ${EndWhile}
@@ -630,9 +908,9 @@ FunctionEnd
     Push $0
     Push $1
     ; OPEN_EXISTING checks write access without truncating or changing the old file.
-    System::Call 'kernel32::CreateFileW(w "${FILE}", i 0x40000000, i 7, p 0, i 3, i 0x80, p 0) p.r0'
+    System::Call 'kernel32::CreateFileW(w "${FILE}", i 0x40000000, i 7, p 0, i 3, i 0x80, p 0) p.r0 ?e'
+    Pop $1
     ${If} $0 P= -1
-      System::Call 'kernel32::GetLastError() i.r1'
       StrCpy $PewPewBlockedFile "${FILE} ($1)"
     ${Else}
       System::Call 'kernel32::CloseHandle(p r0)'
@@ -642,13 +920,51 @@ FunctionEnd
   ${EndIf}
 !macroend
 
+; Writes a freshly copied file to disk. A file that cannot be opened for writing
+; or flushed is added to $PewPewFlushError; PewPewCheckFlush then stops setup.
+!macro PewPewFlushFile FILE
+  Push $0
+  Push $1
+  Push $2
+  System::Call 'kernel32::CreateFileW(w "${FILE}", i 0x40000000, i 7, p 0, i 3, i 0x80, p 0) p.r0 ?e'
+  Pop $1
+  ${If} $0 P= -1
+    StrCpy $PewPewFlushError "$PewPewFlushError${FILE} (open error $1); "
+  ${Else}
+    System::Call 'kernel32::FlushFileBuffers(p r0) i.r2 ?e'
+    Pop $1
+    System::Call 'kernel32::CloseHandle(p r0)'
+    ${If} $2 = 0
+      StrCpy $PewPewFlushError "$PewPewFlushError${FILE} (flush error $1); "
+    ${EndIf}
+  ${EndIf}
+  Pop $2
+  Pop $1
+  Pop $0
+!macroend
+
+; Stops setup when a copied file could not be written to disk. RETRY is the label
+; that flushes the files again.
+!macro PewPewCheckFlush RETRY
+  ${If} $PewPewFlushError != ""
+    !insertmacro PewPewLog "files could not be written to disk: $PewPewFlushError"
+    DetailPrint "$(pewpewFlushFailed)"
+    MessageBox MB_ICONSTOP|MB_RETRYCANCEL "$(pewpewFlushFailed)" /SD IDCANCEL IDRETRY ${RETRY}
+    !insertmacro PewPewLog "cancelled because files could not be written to disk"
+    SetErrorLevel 2
+    Abort
+  ${EndIf}
+  !insertmacro PewPewLog "files written to disk"
+!macroend
+
 !macro PewPewPrepareFiles PREFIX
 Function ${PREFIX}PewPewPrepareFiles
   retry_prepare:
     StrCpy $PewPewBlockedFile ""
+    !insertmacro PewPewLog "preparing installation files"
     !insertmacro PewPewServiceAction "stop"
     ${If} $PewPewBlockedFile == ""
-      !insertmacro PewPewStopOwnCores
+      !insertmacro PewPewOwnCores 1
       !insertmacro PewPewCheckWritable "$INSTDIR\${MAINBINARYNAME}.exe"
       {{#each resources}}
         !insertmacro PewPewCheckWritable "$INSTDIR\\{{this.[1]}}"
@@ -658,11 +974,14 @@ Function ${PREFIX}PewPewPrepareFiles
       {{/each}}
     ${EndIf}
     ${If} $PewPewBlockedFile != ""
+      !insertmacro PewPewLog "installation files are busy: $PewPewBlockedFile"
       DetailPrint "$(pewpewFilesBusy)"
       MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "$(pewpewFilesBusy)" /SD IDCANCEL IDRETRY retry_prepare
+      !insertmacro PewPewLog "cancelled because installation files are busy"
       SetErrorLevel 2
       Abort
     ${EndIf}
+    !insertmacro PewPewLog "installation files are ready"
 FunctionEnd
 !macroend
 
@@ -749,6 +1068,7 @@ Section CheckAndInstallVSRuntime
     ${EndIf}
   ${EndIf}
 
+  !insertmacro PewPewLog "Visual C++ runtime needed: $VC_RUNTIME_NEEDED"
   ${If} $VC_RUNTIME_NEEDED != "1"
     DetailPrint "已检测到匹配的 Visual C++ Redistributable，跳过安装"
     Goto done_vc
@@ -757,9 +1077,11 @@ Section CheckAndInstallVSRuntime
   DetailPrint "正在下载 Visual C++ Redistributable..."
   nsisdl::download "$VC_REDIST_URL" "$TEMP\$VC_REDIST_EXE"
   Pop $0
+  !insertmacro PewPewLog "Visual C++ runtime download: $0"
   ${If} $0 == "success"
     DetailPrint "正在安装 Visual C++ Redistributable..."
     ExecWait '"$TEMP\$VC_REDIST_EXE" /quiet /norestart' $0
+    !insertmacro PewPewLog "Visual C++ runtime installer exit code $0"
     ${If} $0 == 0
       DetailPrint "Visual C++ Redistributable 安装成功"
     ${Else}
@@ -783,6 +1105,7 @@ Section WebView2
   ${If} $4 == ""
     ReadRegStr $4 HKCU "SOFTWARE\Microsoft\EdgeUpdate\Clients\${WEBVIEW2APPGUID}" "pv"
   ${EndIf}
+  !insertmacro PewPewLog "WebView2 runtime version '$4'"
 
   ${If} $4 == ""
     ; Webview2 installation
@@ -825,7 +1148,9 @@ Section WebView2
       install_webview2:
         DetailPrint "$(installingWebview2)"
         ; $6 holds the path to the webview2 installer
+        !insertmacro PewPewLog "installing WebView2 runtime"
         ExecWait "$6 ${WEBVIEW2INSTALLERARGS} /install" $1
+        !insertmacro PewPewLog "WebView2 installer exit code $1"
         ${If} $1 = 0
           DetailPrint "$(webview2InstallSuccess)"
         ${Else}
@@ -867,12 +1192,21 @@ SectionEnd
 
 Section Install
   SetOutPath $INSTDIR
+  !insertmacro PewPewLog "install section started: $INSTDIR"
 
   !ifmacrodef NSIS_HOOK_PREINSTALL
     !insertmacro NSIS_HOOK_PREINSTALL
   !endif
 
-  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  ; Tauri's CheckIfAppIsRunning terminates the client. Wait for its own exit instead,
+  ; which turns TUN off and stops the connection core cleanly.
+  Call PewPewWaitForClientExit
+  Pop $0
+  ${If} $0 <> 0
+    !insertmacro PewPewLog "cancelled: the client is still running"
+    SetErrorLevel 2
+    Abort "$(pewpewClientRunningAbort)"
+  ${EndIf}
   Call PewPewPrepareFiles
 
   ; Ensure startup folders exist
@@ -887,9 +1221,11 @@ Section Install
   !insertmacro SetContext
 
   ; Copy main executable
+  !insertmacro PewPewLog "copying the main program"
   File "${MAINBINARYSRCPATH}"
 
   ; Copy resources
+  !insertmacro PewPewLog "copying resources"
   {{#each resources_dirs}}
     CreateDirectory "$INSTDIR\\{{this}}"
   {{/each}}
@@ -898,9 +1234,25 @@ Section Install
   {{/each}}
 
   ; Copy external binaries
+  !insertmacro PewPewLog "copying connection cores"
   {{#each binaries}}
     File /a "/oname={{this}}" "{{no-escape @key}}"
   {{/each}}
+
+  ; Write the new files to disk before going on. A forced power-off right after
+  ; copying once left the last core with its tail unwritten (all zero bytes).
+  ; This narrows that window; it cannot rule out damage from a power loss.
+  flush_installed_files:
+    StrCpy $PewPewFlushError ""
+    !insertmacro PewPewLog "files copied; writing them to disk"
+    !insertmacro PewPewFlushFile "$INSTDIR\${MAINBINARYNAME}.exe"
+    {{#each resources}}
+      !insertmacro PewPewFlushFile "$INSTDIR\\{{this.[1]}}"
+    {{/each}}
+    {{#each binaries}}
+      !insertmacro PewPewFlushFile "$INSTDIR\\{{this}}"
+    {{/each}}
+    !insertmacro PewPewCheckFlush flush_installed_files
 
   !insertmacro PewPewServiceAction "start"
 
@@ -921,6 +1273,7 @@ Section Install
 
   ; Create uninstaller
   WriteUninstaller "$INSTDIR\uninstall.exe"
+  !insertmacro PewPewLog "uninstaller written"
 
   ; Save $INSTDIR in registry for future installations
   WriteRegStr SHCTX "${MANUPRODUCTKEY}" "" $INSTDIR
@@ -962,6 +1315,8 @@ Section Install
     WriteRegStr SHCTX "${UNINSTKEY}" "HelpLink" "${HOMEPAGE}"
   !endif
 
+  !insertmacro PewPewLog "registry entries set"
+
   ; Create start menu shortcut
   !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
     Call CreateOrUpdateStartMenuShortcut
@@ -978,13 +1333,20 @@ Section Install
     !insertmacro NSIS_HOOK_POSTINSTALL
   !endif
 
+  !insertmacro PewPewLog "install section finished"
+
   ; Auto close this page for passive mode
   ${If} $PassiveMode = 1
     SetAutoClose true
   ${EndIf}
 SectionEnd
 
+Function .onInstFailed
+  !insertmacro PewPewLog "finished: failed or cancelled"
+FunctionEnd
+
 Function .onInstSuccess
+  !insertmacro PewPewLog "finished: success"
   ; Check for `/R` flag only in silent and passive installers because
   ; GUI installer has a toggle for the user to (re)start the app
   ${If} $PassiveMode = 1
@@ -992,12 +1354,14 @@ Function .onInstSuccess
     ${GetOptions} $CMDLINE "/R" $R0
     ${IfNot} ${Errors}
       ${GetOptions} $CMDLINE "/ARGS" $R0
+      !insertmacro PewPewLog "launching the client (/R)"
       nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" "$R0"
     ${EndIf}
   ${EndIf}
 FunctionEnd
 
 Function un.onInit
+  !insertmacro PewPewInitLog
   !insertmacro SetContext
 
   !if "${INSTALLMODE}" == "both"
@@ -1015,6 +1379,15 @@ Function un.onInit
   ${IfNot} ${Errors}
     StrCpy $UpdateMode 1
   ${EndIf}
+  !insertmacro PewPewLog "started; passive=$PassiveMode update=$UpdateMode; command line $CMDLINE"
+FunctionEnd
+
+Function un.onUninstFailed
+  !insertmacro PewPewLog "finished: failed or cancelled"
+FunctionEnd
+
+Function un.onUninstSuccess
+  !insertmacro PewPewLog "finished: success"
 FunctionEnd
 
 Section Uninstall
@@ -1023,7 +1396,14 @@ Section Uninstall
     !insertmacro NSIS_HOOK_PREUNINSTALL
   !endif
 
-  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  !insertmacro PewPewLog "uninstall section started: $INSTDIR"
+  Call un.PewPewWaitForClientExit
+  Pop $0
+  ${If} $0 <> 0
+    !insertmacro PewPewLog "cancelled: the client is still running"
+    SetErrorLevel 2
+    Abort "$(pewpewClientRunningAbort)"
+  ${EndIf}
   Call un.PewPewPrepareFiles
   !insertmacro PewPewServiceAction "remove"
 
@@ -1061,6 +1441,7 @@ Section Uninstall
 
   ; Delete uninstaller
   Delete "$INSTDIR\uninstall.exe"
+  !insertmacro PewPewLog "program files removed"
 
   {{#each resources_ancestors}}
   RMDir /REBOOTOK "$INSTDIR\\{{this}}"
@@ -1135,6 +1516,8 @@ Section Uninstall
   !ifmacrodef NSIS_HOOK_POSTUNINSTALL
     !insertmacro NSIS_HOOK_POSTUNINSTALL
   !endif
+
+  !insertmacro PewPewLog "uninstall section finished"
 
   ; Auto close if passive mode or updating
   ${If} $PassiveMode = 1

@@ -56,7 +56,7 @@ pub fn ensure_service_owned() -> Result<()> {
         Err(error) => return Err(error.into()),
     };
     let image_path: String = key.get_value("ImagePath")?;
-    let expected = dirs::service_path()?;
+    let expected = service_helper_path("clash-verge-service.exe")?;
     if !service_path_matches(&image_path, &expected.to_string_lossy()) {
         bail!("pewpew-service-conflict");
     }
@@ -65,7 +65,24 @@ pub fn ensure_service_owned() -> Result<()> {
 
 #[cfg(any(target_os = "windows", test))]
 fn service_path_matches(actual: &str, expected: &str) -> bool {
-    actual.trim().trim_matches('"').eq_ignore_ascii_case(expected)
+    // Registrations made through a `\\?\` path name the same file.
+    fn plain(path: &str) -> &str {
+        let path = path.trim().trim_matches('"');
+        path.strip_prefix(r"\\?\").unwrap_or(path)
+    }
+    plain(actual).eq_ignore_ascii_case(plain(expected))
+}
+
+/// Path of a bundled service file (service, installer or uninstaller).
+///
+/// Tauri resolves resources through a canonicalized `\\?\C:\...` path. cmd.exe
+/// cannot start programs from such a path ("The system cannot find the path
+/// specified"), and the service must be registered with the plain path that the
+/// Windows setup and the ownership check compare against.
+#[cfg(target_os = "windows")]
+fn service_helper_path(file_name: &str) -> Result<PathBuf> {
+    let binary_path = dirs::service_path()?;
+    Ok(dunce::simplified(&binary_path).with_file_name(file_name))
 }
 
 pub async fn prepare_enhanced_connection() -> Result<()> {
@@ -138,8 +155,7 @@ fn uninstall_service() -> Result<()> {
     use runas::Command as RunasCommand;
     use std::os::windows::process::CommandExt as _;
 
-    let binary_path = dirs::service_path()?;
-    let uninstall_path = binary_path.with_file_name("clash-verge-service-uninstall.exe");
+    let uninstall_path = service_helper_path("clash-verge-service-uninstall.exe")?;
 
     if !uninstall_path.exists() {
         bail!(format!("uninstaller not found: {uninstall_path:?}"));
@@ -169,8 +185,7 @@ fn install_service() -> Result<()> {
     use deelevate::{PrivilegeLevel, Token};
     use std::os::windows::process::CommandExt as _;
 
-    let binary_path = dirs::service_path()?;
-    let install_path = binary_path.with_file_name("clash-verge-service-install.exe");
+    let install_path = service_helper_path("clash-verge-service-install.exe")?;
 
     if !install_path.exists() {
         bail!("pewpew-service-install-failed: installer not found: {install_path:?}");
@@ -257,7 +272,7 @@ fn install_service_elevated(install_path: &Path) -> Result<()> {
 fn elevated_install_parameters(install: &Path, sc: &Path, log: &Path) -> Option<String> {
     let quoted = |path: &Path| {
         let text = path.to_str()?;
-        if text.is_empty() || text.contains(['%', '"', '\r', '\n']) {
+        if text.is_empty() || text.starts_with(r"\\?\") || text.contains(['%', '"', '\r', '\n']) {
             return None;
         }
         Some(format!("\"{text}\""))
@@ -865,7 +880,12 @@ mod tests {
     fn elevated_install_command_rejects_paths_cmd_would_rewrite() {
         let sc = Path::new(r"C:\WINDOWS\system32\sc.exe");
         let log = Path::new(r"C:\logs\service-install.log");
-        for install in [r"C:\100%PATH%\install.exe", "C:\\bad\"quote\\install.exe", ""] {
+        for install in [
+            r"C:\100%PATH%\install.exe",
+            "C:\\bad\"quote\\install.exe",
+            "",
+            r"\\?\C:\Program Files\PewPew 云客户端\resources\clash-verge-service-install.exe",
+        ] {
             assert_eq!(
                 elevated_install_parameters(Path::new(install), sc, log),
                 None,
@@ -939,6 +959,10 @@ mod tests {
             expected
         ));
         assert!(!service_path_matches(&format!("{expected} --other"), expected));
+        // Tauri's resource directory is a `\\?\` path; the registry may hold either form.
+        let verbatim = format!(r"\\?\{expected}");
+        assert!(service_path_matches(expected, &verbatim));
+        assert!(service_path_matches(&format!("\"{verbatim}\""), expected));
     }
 
     #[test]
