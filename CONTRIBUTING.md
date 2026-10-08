@@ -16,7 +16,7 @@ pnpm dev
 
 ## Validation
 
-For frontend changes, run the checks used by `.github/workflows/check.yml`:
+GitHub Actions workflows have been removed from this repository. Run validation and builds locally when needed. For frontend changes:
 
 ```sh
 pnpm typecheck
