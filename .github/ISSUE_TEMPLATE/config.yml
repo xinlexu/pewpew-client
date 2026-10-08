@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 讨论交流 / Communication
-    url: https://t.me/clash_verge_rev
-    about: 在 Telegram 群组中与其他用户讨论交流 / Communicate with other users in the Telegram group
+  - name: 使用说明与下载 / Usage and downloads
+    url: https://github.com/xinlexu/pewpew-client#readme
+    about: 查看 PewPew 当前内测状态、下载入口和订阅客服信息 / Current release status and subscription support
+  - name: 版本记录 / Release notes
+    url: https://github.com/xinlexu/pewpew-client/releases
+    about: 核对所用版本及已知问题 / Check your version and known limitations

@@ -1,6 +1,6 @@
 # CONTRIBUTING — i18n
 
-Thanks for helping localize Clash Verge Rev. This guide reflects the current architecture, where the React frontend and the Tauri backend keep their translation bundles separate. Follow the steps below to keep both sides in sync without stepping on each other.
+Thanks for helping localize PewPew Cloud Client, based on Clash Verge Rev. This guide reflects the current architecture, where the React frontend and the Tauri backend keep their translation bundles separate. Follow the steps below to keep both sides in sync without stepping on each other.
 
 ## Quick workflow
 
@@ -54,7 +54,7 @@ Native UI strings (tray menu, notifications, dialogs) use `rust-i18n` with YAML 
 1. Duplicate `src/locales/en/` into `src/locales/<new-lang>/` and translate the JSON files while preserving key structure.
 2. Update the locale’s `index.ts` to import every namespace. Matching the English file is the easiest way to avoid missing exports.
 3. Append the language code to `supportedLanguages` in `src/services/i18n.ts`.
-4. If the backend should expose the language, create `crates/clash-verge-i18n/<new-lang>.yml` and translate the keys used in existing YAML files.
+4. If the backend should expose the language, create `crates/clash-verge-i18n/locales/<new-lang>.yml` and translate the keys used in existing YAML files.
 5. Run `pnpm i18n:format`, `pnpm i18n:types`, and (optionally) `pnpm i18n:check` in dry-run mode to confirm structure.
 
 ## Authoring guidelines
@@ -68,7 +68,7 @@ Native UI strings (tray menu, notifications, dialogs) use `rust-i18n` with YAML 
 ## Testing & QA
 
 - Launch the desktop shell with `pnpm dev` (or `pnpm web:dev`) and navigate through the affected views to confirm translations load and layouts behave.
-- Run `pnpm test` if you touched code that consumes translations or adjusts formatting logic.
+- Run the relevant existing tests if you touched code that consumes translations or adjusts formatting logic.
 - For backend changes, trigger the relevant tray actions or notifications to verify the updated copy.
 - Note any remaining untranslated sections or layout concerns in your PR description so maintainers can follow up.
 

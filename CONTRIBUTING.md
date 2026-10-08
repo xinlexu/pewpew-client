@@ -1,136 +1,45 @@
-# CONTRIBUTING
+# Contributing to PewPew Cloud Client
 
-Thank you for your interest in contributing to **Clash Verge Rev**! This guide provides instructions to help you set up your development environment and start contributing effectively.
+This repository maintains the PewPew-specific client built on Clash Verge Rev. Use this repository's [issues](https://github.com/xinlexu/pewpew-client/issues) and pull requests for changes to this client. Keep upstream attribution and license notices intact.
 
-## Internationalization (i18n)
+## Development setup
 
-We welcome translations and improvements to existing locales. For details on contributing translations, please see [CONTRIBUTING_i18n.md](docs/CONTRIBUTING_i18n.md).
+Install Node.js 22, pnpm 10.33.0, the Rust toolchain specified by `rust-toolchain.toml`, and the [Tauri platform prerequisites](https://tauri.app/start/prerequisites/). Windows builds use the MSVC toolchain. Cross-platform source support does not mean a tested PewPew installer is available for every platform.
 
-## Development Setup
-
-Before contributing, you need to set up your development environment. Follow the steps below carefully.
-
-### Prerequisites
-
-1. **Install Rust and Node.js**  
-   Our project requires both Rust and Node.js. Follow the official installation instructions [here](https://tauri.app/start/prerequisites/).
-
-### Windows Users
-
-> [!NOTE]  
-> **Windows ARM users must also install [LLVM](https://github.com/llvm/llvm-project/releases) (including clang) and set the corresponding environment variables.**  
-> The `ring` crate depends on `clang` when building on Windows ARM.
-
-Additional steps for Windows:
-
-- Ensure Rust and Node.js are added to your system `PATH`.
-
-- Install the GNU `patch` tool.
-
-- Use the MSVC toolchain for Rust:
-
-```bash
-rustup target add x86_64-pc-windows-msvc
-rustup set default-host x86_64-pc-windows-msvc
-```
-
-### Install Node.js Package Manager
-
-Enable `corepack`:
-
-```bash
-corepack enable
-```
-
-### Install Project Dependencies
-
-Node.js dependencies:
-
-```bash
-pnpm install
-```
-
-Ubuntu-only system packages:
-
-```bash
-sudo apt-get install -y libxslt1.1 libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-```
-
-### Download the Mihomo Core Binary (Automatic)
-
-```bash
+```sh
+pnpm install --frozen-lockfile
 pnpm run prebuild
-pnpm run prebuild --force  # Re-download and overwrite Mihomo core and service binaries
+pnpm dev
 ```
 
-### Run the Development Server
+`prebuild` obtains the native sidecars needed for local development. The checked-in lockfiles and toolchain files define the dependency baseline.
 
-```bash
-pnpm dev           # Standard
-pnpm dev:diff      # If an app instance already exists
-pnpm dev:tauri     # Run Tauri development mode
+## Validation
+
+For frontend changes, run the checks used by `.github/workflows/check.yml`:
+
+```sh
+pnpm typecheck
+pnpm web:build
 ```
 
-### Build the Project
+Run the relevant existing tests for the code you changed. For Rust changes, also run `cargo check` for the target platform and the affected Rust tests. Translation work has a separate [i18n guide](docs/CONTRIBUTING_i18n.md).
 
-Standard build:
+Document what was verified and any remaining platform or real-device checks. Build success alone does not confirm installation, upgrade, exit behavior or real network connectivity.
 
-```bash
-pnpm build
-```
+## Changes and pull requests
 
-Fast build for testing:
+1. Create a focused branch from `main`.
+2. Make one coherent change and preserve existing user configuration behavior.
+3. Run relevant validation and describe the result in the pull request.
+4. Update the user documentation when behavior changes.
 
-```bash
-pnpm build:fast
-```
+Use a GitHub no-reply commit email if you prefer not to publish an email address. Do not include subscription URLs, tokens, account data or unredacted diagnostics in commits or public reports.
 
-### Clean Build
+## Releases and documentation
 
-```bash
-pnpm clean
-```
-
-### Portable Version (Windows Only)
-
-```bash
-pnpm portable
-```
-
-## Contributing Your Changes
-
-### Before Committing
-
-**Code quality checks:**
-
-```bash
-# Rust backend
-cargo clippy-all
-# Frontend
-pnpm lint
-```
-
-**Code formatting:**
-
-```bash
-# Rust backend
-cargo fmt
-# Frontend
-pnpm format
-```
-
-### Signing your commit
-
-Signed commits are required to verify authorship and ensure your contributions can be merged. Reference signing-commits [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
-
-### Submitting Your Changes
-
-1. Fork the repository.
-
-2. Create a new branch for your feature or bug fix.
-
-3. Commit your changes with clear messages and make sure it's signed.
-
-4. Push your branch and submit a pull request.
-
-We appreciate your contributions and look forward to your participation!
+- The [main README](README.md#下载) is the current download entry point.
+- [Changelog.md](Changelog.md) records PewPew releases. [Upstream history](docs/Changelog.history.md) is reference material.
+- Keep internal test builds marked as prereleases and include known limitations and checksums.
+- Retain old packages for traceability, label obsolete builds clearly, and do not change existing tags or replace previously published binaries during a documentation cleanup.
+- Update the Chinese README and English guide together when release status changes. Other language pages point readers to these maintained guides.

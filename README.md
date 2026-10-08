@@ -4,6 +4,14 @@ PewPew 云客户端是面向 PewPew 云用户的简化版桌面客户端，用�
 
 本项目基于 Clash Verge Rev、mihomo / Clash.Meta 与 Tauri 构建，不重写网络内核，只针对 PewPew 云使用场景做品牌化与客户版界面简化。
 
+## 文档导航
+
+- [English guide](docs/README_en.md)
+- [版本记录](Changelog.md) · [开发与贡献](CONTRIBUTING.md) · [多语言贡献](docs/CONTRIBUTING_i18n.md)
+- [问题反馈](https://github.com/xinlexu/pewpew-client/issues/new/choose)
+
+本仓库的发布页面区分当前内测包与历史构建；旧 `autobuild` 仅供追溯，不作为当前下载入口。
+
 ## 下载
 
 **Windows x64 安装流程加固内测版（0.1.4，2026-10-07）：[下载安装包（.exe）](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.4-windows-test.20261007/PewPewCloud_0.1.4_windows-x64_test-20261007_setup.exe)**
