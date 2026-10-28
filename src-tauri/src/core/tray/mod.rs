@@ -557,7 +557,7 @@ fn is_blocked_tray_route_name(name: &str) -> bool {
     }
 
     let upper_value = value.to_uppercase();
-    if matches!(upper_value.as_str(), "DIRECT" | "REJECT" | "GLOBAL") {
+    if matches!(upper_value.as_str(), "DIRECT" | "REJECT" | "GLOBAL" | "PASS") || name.starts_with("PewPew Internal ") {
         return true;
     }
 
@@ -626,6 +626,9 @@ fn resolve_tray_current_route(proxy_nodes_data: Option<&Proxies>) -> Option<Stri
     }
 
     proxy_nodes_data.proxies.values().find_map(|group| {
+        if group.hidden.unwrap_or_default() || group.name.starts_with("PewPew Internal ") {
+            return None;
+        }
         if group.all.as_ref().map(|all| all.is_empty()).unwrap_or(true) {
             return None;
         }
@@ -1098,6 +1101,7 @@ fn on_menu_event(_: &AppHandle, event: MenuEvent) {
                 }
             }
             MenuIds::EXIT => {
+                logging!(info, Type::Tray, "托盘菜单点击: 退出");
                 feat::quit().await;
             }
             id if id.starts_with("profiles_") => {

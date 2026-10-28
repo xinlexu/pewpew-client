@@ -1,5 +1,10 @@
-import { InfoOutlined, SettingsRounded } from '@mui/icons-material'
 import {
+  InfoOutlined,
+  RateReviewOutlined,
+  SettingsRounded,
+} from '@mui/icons-material'
+import {
+  Badge,
   Box,
   Button,
   ButtonBase,
@@ -7,6 +12,7 @@ import {
   Tooltip,
   Typography,
   alpha,
+  keyframes,
   useTheme,
   type Theme,
 } from '@mui/material'
@@ -30,10 +36,13 @@ import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
 import {
   AboutDialog,
+  ConflictDialog,
+  type ConflictPrompt,
   PreferencesDialog,
+  SupportDialog,
+  type SupportMode,
 } from '@/components/home/pewpew-dialogs'
 import {
-  PEWPEW_WECHAT_ID,
   WECHAT_GREEN,
   copyToClipboard,
   glassOutlinedButtonSx,
@@ -43,11 +52,14 @@ import {
   reducedMotion,
   surfaceSx,
 } from '@/components/home/pewpew-ui'
+import { UpdateDialog } from '@/components/home/pewpew-update'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
+import { SpeedTestDialog } from '@/components/home/speed-test'
 import {
   refreshConnectionState,
   useConnectionState,
 } from '@/hooks/use-connection-state'
+import { useDailyUpdateCheck, usePewPewUpdate } from '@/hooks/use-pewpew-update'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useRouteGuard, useRoutesBusy } from '@/hooks/use-route-guard'
 import { useVerge } from '@/hooks/use-verge'
@@ -57,9 +69,20 @@ import {
   useCoreDataStatus,
   useProxiesData,
 } from '@/providers/app-data-context'
-import { enhanceProfiles, patchClashMode, updateProfile } from '@/services/cmds'
+import {
+  detectProxyConflicts,
+  enhanceProfiles,
+  patchClashMode,
+  updateProfile,
+} from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
+import {
+  configuredMixedPort,
+  findProxyConflict,
+  isProxyPortOpen,
+  switchProxyPort,
+} from '@/services/proxy-conflicts'
 import {
   PEWPEW_LAST_YAML_PROFILE_KEY,
   PEWPEW_UNKNOWN_STATUS,
@@ -175,6 +198,20 @@ const HomePage = () => {
   const [lineSyncing, setLineSyncing] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [preferencesOpen, setPreferencesOpen] = useState(false)
+  const [supportMode, setSupportMode] = useState<SupportMode | null>(null)
+  // Kept after closing so the dialog does not change while it fades out.
+  const [lastSupportMode, setLastSupportMode] = useState<SupportMode>('wechat')
+  const [updateOpen, setUpdateOpen] = useState(false)
+  const [speedTestOpen, setSpeedTestOpen] = useState(false)
+  const [conflictPrompt, setConflictPrompt] = useState<ConflictPrompt | null>(
+    null,
+  )
+  const [conflictOpen, setConflictOpen] = useState(false)
+  const conflictDecisionRef = useRef<((proceed: boolean) => void) | null>(null)
+  // Apps the user already chose to run alongside PewPew in this session.
+  const acceptedConflictAppsRef = useRef('')
+  const { update: availableUpdate } = usePewPewUpdate()
+  useDailyUpdateCheck()
   const [repairingNetwork, setRepairingNetwork] = useState(false)
   const [lastConnectionError, setLastConnectionError] = useState('')
   const [autoUpdateRoutesOnStartup, setAutoUpdateRoutesOnStartup] = useState(
@@ -286,14 +323,31 @@ const HomePage = () => {
     refreshDelaySummary()
   }, [])
 
-  const handleCopyWechat = useCallback(async () => {
-    try {
-      await copyToClipboard(PEWPEW_WECHAT_ID)
-      showNotice.success(t('home.pewpew.header.wechatCopied'))
-    } catch {
-      showNotice.error(t('home.pewpew.diagnostics.copyFailed'))
-    }
-  }, [t])
+  const openSupport = useCallback((mode: SupportMode) => {
+    setLastSupportMode(mode)
+    setSupportMode(mode)
+  }, [])
+
+  // Shows the conflict prompt and waits for the user's choice.
+  const askAboutConflict = useCallback(
+    (prompt: ConflictPrompt) =>
+      new Promise<boolean>((resolve) => {
+        conflictDecisionRef.current?.(false)
+        conflictDecisionRef.current = resolve
+        setConflictPrompt(prompt)
+        setConflictOpen(true)
+      }),
+    [],
+  )
+
+  const answerConflict = useCallback((proceed: boolean) => {
+    setConflictOpen(false)
+    const resolve = conflictDecisionRef.current
+    conflictDecisionRef.current = null
+    resolve?.(proceed)
+  }, [])
+
+  useEffect(() => () => conflictDecisionRef.current?.(false), [])
 
   const handleRepairNetwork = useCallback(async () => {
     setRepairingNetwork(true)
@@ -313,60 +367,71 @@ const HomePage = () => {
     }
   }, [setConnected, t])
 
-  const handleCopyDiagnostics = useCallback(async () => {
+  const buildDiagnostics = useCallback(async () => {
+    const [appVersion, coreConfig, conflicts] = await Promise.all([
+      getVersion().catch(() => 'unknown'),
+      getBaseConfig().catch(() => null),
+      detectProxyConflicts().catch(() => null),
+    ])
+    const proxyPort = configuredMixedPort(verge, coreConfig)
+    const hasSubscriptionStatus = Object.values(subscriptionStatus).some(
+      (value) => value !== PEWPEW_UNKNOWN_STATUS,
+    )
+    let lastYamlProfileUid: string | null = null
     try {
-      const appVersion = await getVersion().catch(() => 'unknown')
-      const hasSubscriptionStatus = Object.values(subscriptionStatus).some(
-        (value) => value !== PEWPEW_UNKNOWN_STATUS,
-      )
-      let lastYamlProfileUid: string | null = null
-      try {
-        lastYamlProfileUid = localStorage.getItem(PEWPEW_LAST_YAML_PROFILE_KEY)
-      } catch {}
-      const diagnostics = [
-        'PewPew Cloud Client Diagnostics',
-        `Version: ${appVersion}`,
-        `OS: ${navigator.platform || 'unknown'} (${navigator.userAgent || 'unknown'})`,
-        `Language: ${i18n.language || 'unknown'}`,
-        `Theme: ${verge?.theme_mode ?? theme.palette.mode}`,
-        `Connection: ${connectionEnabled ? 'connected' : 'disconnected'}`,
-        `Connection mode: ${connectionMode}`,
-        `System proxy: ${systemProxyEnabled ? 'enabled' : 'disabled'}`,
-        `Enhanced routing: ${tunEnabled ? 'enabled' : 'disabled'}`,
-        `Route UDP capability: ${String(proxies?.records?.[proxyGroupResult.currentName]?.udp ?? 'unknown')}`,
-        'Voice connectivity: not tested',
-        `Current route: ${currentLine?.name || 'not selected'}`,
-        `Current route valid: ${currentRouteValid ? 'yes' : 'no'}`,
-        `Mode: ${clashConfig?.mode || 'unknown'}`,
-        `Last route update: ${
-          current?.updated
-            ? dayjs(current.updated * 1000).format('YYYY-MM-DD HH:mm:ss')
-            : 'never'
-        }`,
-        `Last connection error: ${lastConnectionError || 'none'}`,
-        `Has usable routes: ${hasUsableRoutes ? 'yes' : 'no'}`,
-        `Has subscription status: ${hasSubscriptionStatus ? 'yes' : 'no'}`,
-        `Profile type: ${getProfileDiagnosticsType(current)}`,
-        `Current profile just imported YAML: ${
-          current?.uid && lastYamlProfileUid === current.uid ? 'yes' : 'no'
-        }`,
-        `Account state: ${accountEvaluation.state}`,
-        `Blocked by expired plan: ${accountEvaluation.expired ? 'yes' : 'no'}`,
-        `Blocked by exhausted data: ${
-          accountEvaluation.dataExhausted ? 'yes' : 'no'
-        }`,
-        `Route count: ${proxyGroupResult.options.length}`,
-        `Filtered informational items: ${proxyGroupResult.filteredInfoCount}`,
-        `Main proxy group: ${proxyGroupResult.group?.name || 'none'}`,
-        `Generated at: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
-      ].join('\n')
-
-      await copyToClipboard(diagnostics)
-      showNotice.success(t('home.pewpew.diagnostics.copySuccess'))
-    } catch (error) {
-      console.error('[PewPew] 复制诊断信息失败:', error)
-      showNotice.error(t('home.pewpew.diagnostics.copyFailed'))
-    }
+      lastYamlProfileUid = localStorage.getItem(PEWPEW_LAST_YAML_PROFILE_KEY)
+    } catch {}
+    const diagnostics = [
+      'PewPew Cloud Client Diagnostics',
+      `Version: ${appVersion}`,
+      `OS: ${navigator.platform || 'unknown'} (${navigator.userAgent || 'unknown'})`,
+      `Language: ${i18n.language || 'unknown'}`,
+      `Theme: ${verge?.theme_mode ?? theme.palette.mode}`,
+      `Connection: ${connectionEnabled ? 'connected' : 'disconnected'}`,
+      `Connection mode: ${connectionMode}`,
+      `System proxy: ${systemProxyEnabled ? 'enabled' : 'disabled'}`,
+      `Enhanced routing: ${tunEnabled ? 'enabled' : 'disabled'}`,
+      `Route UDP capability: ${String(proxies?.records?.[proxyGroupResult.currentName]?.udp ?? 'unknown')}`,
+      `Local proxy port: ${proxyPort} (${
+        coreConfig
+          ? isProxyPortOpen(coreConfig)
+            ? 'listening'
+            : 'used by another program'
+          : 'core unreachable'
+      })`,
+      `Other proxy apps: ${
+        conflicts
+          ? conflicts.apps.length
+            ? conflicts.apps.join(', ')
+            : 'none'
+          : 'unknown'
+      }`,
+      `Current route: ${currentLine?.name || 'not selected'}`,
+      `Current route valid: ${currentRouteValid ? 'yes' : 'no'}`,
+      `Mode: ${clashConfig?.mode || 'unknown'}`,
+      `Last route update: ${
+        current?.updated
+          ? dayjs(current.updated * 1000).format('YYYY-MM-DD HH:mm:ss')
+          : 'never'
+      }`,
+      `Last connection error: ${lastConnectionError || 'none'}`,
+      `Has usable routes: ${hasUsableRoutes ? 'yes' : 'no'}`,
+      `Has subscription status: ${hasSubscriptionStatus ? 'yes' : 'no'}`,
+      `Profile type: ${getProfileDiagnosticsType(current)}`,
+      `Current profile just imported YAML: ${
+        current?.uid && lastYamlProfileUid === current.uid ? 'yes' : 'no'
+      }`,
+      `Account state: ${accountEvaluation.state}`,
+      `Blocked by expired plan: ${accountEvaluation.expired ? 'yes' : 'no'}`,
+      `Blocked by exhausted data: ${
+        accountEvaluation.dataExhausted ? 'yes' : 'no'
+      }`,
+      `Route count: ${proxyGroupResult.options.length}`,
+      `Filtered informational items: ${proxyGroupResult.filteredInfoCount}`,
+      `Main proxy group: ${proxyGroupResult.group?.name || 'none'}`,
+      `Generated at: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+    ].join('\n')
+    return diagnostics
   }, [
     clashConfig?.mode,
     connectionEnabled,
@@ -386,10 +451,26 @@ const HomePage = () => {
     proxyGroupResult.group?.name,
     proxyGroupResult.options.length,
     subscriptionStatus,
-    t,
     theme.palette.mode,
-    verge?.theme_mode,
+    verge,
   ])
+
+  // Copies the diagnostics; resolves false instead of throwing.
+  const copyDiagnostics = useCallback(async () => {
+    try {
+      await copyToClipboard(await buildDiagnostics())
+      return true
+    } catch (error) {
+      console.error('[PewPew] 复制诊断信息失败:', error)
+      return false
+    }
+  }, [buildDiagnostics])
+
+  const handleCopyDiagnostics = useCallback(async () => {
+    if (await copyDiagnostics())
+      showNotice.success(t('home.pewpew.diagnostics.copySuccess'))
+    else showNotice.error(t('home.pewpew.diagnostics.copyFailed'))
+  }, [copyDiagnostics, t])
 
   const handleAutoUpdateRoutesOnStartupChange = useCallback(
     (enabled: boolean) => {
@@ -399,12 +480,45 @@ const HomePage = () => {
     [],
   )
 
+  // Another proxy app or a taken proxy port makes every route time out.
+  const resolveConflicts = useCallback(
+    async (config: Awaited<ReturnType<typeof getBaseConfig>>) => {
+      const conflict = await findProxyConflict(config).catch(() => null)
+      if (!conflict) return true
+      const appsKey = conflict.apps.join('|')
+      const alreadyAccepted =
+        conflict.busyPort === null &&
+        appsKey === acceptedConflictAppsRef.current
+      if (alreadyAccepted) return true
+      if (!(await askAboutConflict(conflict))) return 'cancelled' as const
+      acceptedConflictAppsRef.current = appsKey
+      if (conflict.busyPort === null) return true
+      try {
+        const port = await switchProxyPort(conflict.busyPort)
+        showNotice.info(
+          t('home.pewpew.conflict.portSwitched', {
+            from: conflict.busyPort,
+            to: port,
+          }),
+        )
+        return true
+      } catch (error) {
+        console.error('[PewPew] 切换代理端口失败:', error)
+        showNotice.error(t('home.pewpew.conflict.portSwitchFailed'))
+        return false
+      }
+    },
+    [askAboutConflict, t],
+  )
+
   const handleBeforeConnect = useCallback(async () => {
     setPreparingConnection(true)
     try {
       const config = await getBaseConfig().catch(() => {
         throw new Error('pewpew-core-unavailable')
       })
+      const conflictResult = await resolveConflicts(config)
+      if (conflictResult !== true) return conflictResult
       // Connecting in direct mode would bypass every route; use Smart mode.
       if (config.mode?.toLowerCase() === 'direct') {
         if (!(await ensureValidRoute({ mode: 'rule' }))) return false
@@ -423,7 +537,7 @@ const HomePage = () => {
     } finally {
       setPreparingConnection(false)
     }
-  }, [ensureValidRoute, refreshClashConfig, t])
+  }, [ensureValidRoute, refreshClashConfig, resolveConflicts, t])
 
   useEffect(() => {
     if (startupUpdateRanRef.current) return
@@ -497,7 +611,7 @@ const HomePage = () => {
     <Stack spacing={0.75} sx={{ alignItems: 'center', maxWidth: 380 }}>
       <Button
         variant="outlined"
-        onClick={() => void handleCopyWechat()}
+        onClick={() => openSupport('wechat')}
         startIcon={<WeChatBadge size={20} />}
         sx={[glassOutlinedButtonSx, { px: 2 }]}
       >
@@ -566,7 +680,9 @@ const HomePage = () => {
         <PewPewHeader
           onAbout={() => setAboutOpen(true)}
           onPreferences={() => setPreferencesOpen(true)}
-          onCopyWechat={() => void handleCopyWechat()}
+          onOpenWechat={() => openSupport('wechat')}
+          onFeedback={() => openSupport('feedback')}
+          updateAvailable={!!availableUpdate}
         />
 
         {stage !== 'onboarding' && (
@@ -608,6 +724,7 @@ const HomePage = () => {
                 statusTone={statusTone}
                 pendingLabel={pendingLabel}
                 beforeConnect={handleBeforeConnect}
+                onSpeedTest={() => setSpeedTestOpen(true)}
                 footer={blockedFooter}
               />
 
@@ -657,7 +774,32 @@ const HomePage = () => {
       <AboutDialog
         open={aboutOpen}
         onClose={() => setAboutOpen(false)}
-        onCopyDiagnostics={handleCopyDiagnostics}
+        onOpenWechat={() => openSupport('wechat')}
+        onFeedback={() => openSupport('feedback')}
+        onOpenUpdate={() => setUpdateOpen(true)}
+      />
+      <SupportDialog
+        open={supportMode !== null}
+        mode={supportMode ?? lastSupportMode}
+        onClose={() => setSupportMode(null)}
+        copyDiagnostics={copyDiagnostics}
+      />
+      <ConflictDialog
+        open={conflictOpen}
+        conflict={conflictPrompt}
+        onCancel={() => answerConflict(false)}
+        onConfirm={() => answerConflict(true)}
+      />
+      <UpdateDialog
+        open={updateOpen}
+        update={availableUpdate}
+        onClose={() => setUpdateOpen(false)}
+      />
+      <SpeedTestDialog
+        open={speedTestOpen}
+        routeName={currentLine?.name}
+        delayText={currentDelayText}
+        onClose={() => setSpeedTestOpen(false)}
       />
       <PreferencesDialog
         autoUpdateRoutesOnStartup={autoUpdateRoutesOnStartup}
@@ -677,11 +819,15 @@ const HomePage = () => {
 const PewPewHeader = ({
   onAbout,
   onPreferences,
-  onCopyWechat,
+  onOpenWechat,
+  onFeedback,
+  updateAvailable,
 }: {
   onAbout: () => void
   onPreferences: () => void
-  onCopyWechat: () => void
+  onOpenWechat: () => void
+  onFeedback: () => void
+  updateAvailable: boolean
 }) => {
   const { t } = useTranslation()
 
@@ -763,10 +909,10 @@ const PewPewHeader = ({
         data-tauri-drag-region="false"
         sx={{ alignItems: 'center', flexShrink: 0 }}
       >
-        <Tooltip title={t('home.pewpew.header.copyWechat')}>
+        <Tooltip title={t('home.pewpew.header.addWechat')}>
           <ButtonBase
-            onClick={onCopyWechat}
-            aria-label={`${t('home.pewpew.header.wechat')} · ${t('home.pewpew.header.copyWechat')}`}
+            onClick={onOpenWechat}
+            aria-label={`${t('home.pewpew.header.wechat')} · ${t('home.pewpew.header.addWechat')}`}
             sx={(theme) => {
               const light = isLightTheme(theme)
               return {
@@ -792,9 +938,14 @@ const PewPewHeader = ({
                     ? '0 6px 18px rgba(40, 70, 140, 0.1) !important'
                     : 'none',
                 },
-                transition: 'background-color 160ms ease',
+                transition: 'background-color 160ms ease, transform 120ms ease',
                 '&:hover': {
                   bgcolor: alpha(WECHAT_GREEN, light ? 0.12 : 0.14),
+                },
+                '&:active': { transform: 'scale(0.97)' },
+                [reducedMotion]: {
+                  transition: 'none',
+                  '&:active': { transform: 'none' },
                 },
               }
             }}
@@ -811,6 +962,23 @@ const PewPewHeader = ({
               {t('home.pewpew.header.wechat')}
             </Typography>
           </ButtonBase>
+        </Tooltip>
+
+        <Tooltip title={t('home.pewpew.header.feedbackHint')}>
+          <Button
+            variant="text"
+            startIcon={<RateReviewOutlined />}
+            onClick={onFeedback}
+            aria-label={t('home.pewpew.header.feedbackHint')}
+            sx={headerButtonSx}
+          >
+            <Box
+              component="span"
+              sx={{ display: { xs: 'none', sm: 'inline' } }}
+            >
+              {t('home.pewpew.header.feedback')}
+            </Box>
+          </Button>
         </Tooltip>
 
         <Tooltip title={t('home.pewpew.header.preferences')}>
@@ -830,12 +998,39 @@ const PewPewHeader = ({
           </Button>
         </Tooltip>
 
-        <Tooltip title={t('home.pewpew.header.about')}>
+        <Tooltip
+          title={
+            updateAvailable
+              ? `${t('home.pewpew.header.about')} · ${t('home.pewpew.update.badge')}`
+              : t('home.pewpew.header.about')
+          }
+        >
           <Button
             variant="text"
-            startIcon={<InfoOutlined />}
+            startIcon={
+              <Badge
+                variant="dot"
+                color="error"
+                invisible={!updateAvailable}
+                overlap="circular"
+                sx={{
+                  '& .MuiBadge-dot': {
+                    animation: updateAvailable
+                      ? `${badgePop} 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both`
+                      : 'none',
+                    [reducedMotion]: { animation: 'none' },
+                  },
+                }}
+              >
+                <InfoOutlined />
+              </Badge>
+            }
             onClick={onAbout}
-            aria-label={t('home.pewpew.header.about')}
+            aria-label={
+              updateAvailable
+                ? `${t('home.pewpew.header.about')} · ${t('home.pewpew.update.badge')}`
+                : t('home.pewpew.header.about')
+            }
             sx={headerButtonSx}
           >
             <Box
@@ -850,6 +1045,12 @@ const PewPewHeader = ({
     </Box>
   )
 }
+
+const badgePop = keyframes`
+  0% { transform: scale(0) translate(50%, -50%); }
+  70% { transform: scale(1.35) translate(50%, -50%); }
+  100% { transform: scale(1) translate(50%, -50%); }
+`
 
 const WeChatBadge = ({ size = 24 }: { size?: number }) => (
   <Box

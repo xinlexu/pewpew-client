@@ -121,7 +121,7 @@ const state = {
     enable_tun_mode: connected && enhanced,
     pewpew_enhanced_mode: enhanced,
     pewpew_enhanced_accepted: enhanced || params.has('accepted'),
-    verge_mixed_port: 7897,
+    verge_mixed_port: 7966,
     proxy_host: '127.0.0.1',
     auto_close_connection: true,
     enable_auto_launch: false,
@@ -155,7 +155,8 @@ const state = {
     socksPort: 0,
     redirPort: 0,
     tproxyPort: 0,
-    mixedPort: 7897,
+    // 0 means another program already holds the proxy port.
+    mixedPort: params.has('portBusy') ? 0 : 7966,
     allowLan: false,
     bindAddress: '*',
     mode: params.get('mode') || 'rule',
@@ -163,11 +164,12 @@ const state = {
     ipv6: false,
     tun: { enable: scenario === 'enhanced' },
   },
-  system: { enable: connected, server: '127.0.0.1:7897', bypass: '' },
+  system: { enable: connected, server: '127.0.0.1:7966', bypass: '' },
   coreDown: params.has('coreDown'),
 }
 
 const calls: Array<{ command: string; args: any; mode: string }> = []
+const speedTest = { running: false, cancelled: false }
 ;(window as any).homeTest = { state, records, calls, unknown: [] as string[] }
 
 mockWindows('main')
@@ -183,8 +185,13 @@ mockIPC(
         await new Promise((r) => setTimeout(r, 120))
         const patch = args.payload
         Object.assign(state.verge, patch)
-        if (patch.enable_system_proxy !== undefined)
+        // A new proxy port restarts the core on that port.
+        if (patch.verge_mixed_port)
+          state.config.mixedPort = patch.verge_mixed_port
+        if (patch.enable_system_proxy !== undefined) {
           state.system.enable = patch.enable_system_proxy
+          state.system.server = `127.0.0.1:${state.verge.verge_mixed_port}`
+        }
         if (patch.enable_tun_mode !== undefined)
           state.config.tun.enable = patch.enable_tun_mode
         return null
@@ -202,6 +209,61 @@ mockIPC(
         return { enable: false, url: '' }
       case 'get_running_mode':
         return 'Sidecar'
+      case 'set_discord_probe_context':
+        return null
+      case 'follow_manual_discord_route':
+        if (params.has('discordResetFails'))
+          throw new Error('Discord route reset failed')
+        return null
+      case 'get_discord_probe_status':
+        return { state: 'following', route: null }
+      case 'detect_proxy_conflicts':
+        return {
+          apps: params.get('otherApps')
+            ? params.get('otherApps')!.split(',')
+            : [],
+        }
+      case 'find_free_proxy_port':
+        return params.has('noFreePort') ? null : 7969
+      case 'patch_clash_config':
+        return null
+      case 'get_portable_flag':
+        return false
+      case 'prepare_update_install':
+        if (params.has('cleanupFails')) throw new Error('cleanup incomplete')
+        return null
+      case 'restart_app':
+        if (params.has('restartFails')) throw new Error('restart failed')
+        return null
+      case 'plugin:resources|close':
+        return null
+      case 'plugin:updater|check':
+        if (params.has('updateCheckFails')) throw new Error('unreachable')
+        return params.get('update')
+          ? {
+              rid: 41,
+              currentVersion: '0.1.4',
+              version: params.get('update'),
+              date: '2026-10-08T00:00:00Z',
+              body: '- 修复与 Clash Verge 同时运行时全部超时\n- 新增客服二维码',
+              rawJson: {},
+            }
+          : null
+      case 'plugin:updater|download': {
+        const send = args.onEvent.onmessage
+        send({ event: 'Started', data: { contentLength: 1000 } })
+        for (let i = 0; i < 4; i += 1) {
+          await new Promise((r) => setTimeout(r, 80))
+          send({ event: 'Progress', data: { chunkLength: 250 } })
+        }
+        send({ event: 'Finished' })
+        if (params.has('downloadFails')) throw new Error('download failed')
+        return 42
+      }
+      case 'plugin:updater|install':
+        if (params.has('installFails')) throw new Error('installer cancelled')
+        // The real client exits here.
+        return null
       case 'get_app_uptime':
         return 120000
       case 'is_service_available':
@@ -240,7 +302,57 @@ mockIPC(
       case 'sync_tray_proxy_selection':
         return null
       case 'plugin:mihomo|get_connections':
-        return { connections: [] }
+        return {
+          connections: speedTest.running
+            ? [
+                {
+                  id: 'speed',
+                  metadata: { host: 'speed.cloudflare.com' },
+                  chains: params.has('speedDirect')
+                    ? ['DIRECT']
+                    : [routeNames[0], 'PewPew 云'],
+                },
+              ]
+            : [],
+        }
+      case 'run_speed_test': {
+        if (speedTest.running) throw new Error('pewpew-speed-test-running')
+        const send = args.onProgress.onmessage
+        speedTest.running = true
+        speedTest.cancelled = false
+        try {
+          if (params.has('speedFails')) {
+            await new Promise((r) => setTimeout(r, 300))
+            throw new Error('pewpew-speed-test-failed')
+          }
+          const steps =
+            params.has('speedDirect') || params.has('speedSlow') ? 12 : 6
+          for (let i = 1; i <= steps; i += 1) {
+            await new Promise((r) => setTimeout(r, 200))
+            if (speedTest.cancelled) {
+              if (params.has('speedCancelSlow'))
+                await new Promise((r) => setTimeout(r, 800))
+              throw new Error('pewpew-speed-test-cancelled')
+            }
+            send({
+              elapsedMs: i * 200,
+              bytes: i * 4_000_000,
+              mbps: 120 + i * 10,
+            })
+          }
+          return {
+            mbps: 186.4,
+            averageMbps: 170.2,
+            bytes: 150_000_000,
+            elapsedMs: 8000,
+          }
+        } finally {
+          speedTest.running = false
+        }
+      }
+      case 'cancel_speed_test':
+        speedTest.cancelled = true
+        return null
       case 'plugin:mihomo|get_base_config':
         if (state.coreDown) throw new Error('core unreachable')
         return structuredClone(state.config)

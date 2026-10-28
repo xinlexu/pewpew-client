@@ -215,10 +215,14 @@ export interface TranslationResources {
           inactive: string
           incomplete: string
           mode: string
-          notTested: string
+          noOtherApps: string
+          otherApps: string
           permissionBody: string
           permissionDenied: string
           permissionTitle: string
+          port: string
+          portBusy: string
+          portListening: string
           rollbackFailed: string
           service: string
           serviceConflict: string
@@ -239,7 +243,15 @@ export interface TranslationResources {
           udpUnsupported: string
           unknown: string
           unsupported: string
-          voice: string
+        }
+        conflict: {
+          apps: string
+          continue: string
+          port: string
+          portSwitched: string
+          portSwitchFailed: string
+          switchAndConnect: string
+          title: string
         }
         connection: {
           directMode: string
@@ -289,9 +301,19 @@ export interface TranslationResources {
           copyFailed: string
           copySuccess: string
         }
+        discord: {
+          following: string
+          label: string
+          manual: string
+          selected: string
+          testing: string
+        }
         header: {
           about: string
+          addWechat: string
           copyWechat: string
+          feedback: string
+          feedbackHint: string
           preferences: string
           subtitle: string
           title: string
@@ -328,6 +350,20 @@ export interface TranslationResources {
           noneSelected: string
           switchedToSmart: string
         }
+        speedTest: {
+          again: string
+          button: string
+          connecting: string
+          dataUsed: string
+          direct: string
+          download: string
+          failed: string
+          hint: string
+          latency: string
+          stop: string
+          testing: string
+          title: string
+        }
         subscription: {
           autoUpdateFailed: string
           changeLink: string
@@ -359,6 +395,46 @@ export interface TranslationResources {
           yamlSupport: string
           yamlSwitched: string
           yamlTemporarilyStopped: string
+        }
+        support: {
+          copied: string
+          copyAgain: string
+          copyId: string
+          copying: string
+          diagnosticsCopied: string
+          diagnosticsFailed: string
+          feedbackTitle: string
+          scanHint: string
+          stepDescribe: string
+          stepScan: string
+          wechatId: string
+          wechatTitle: string
+        }
+        update: {
+          available: string
+          badge: string
+          check: string
+          checking: string
+          cleanupFailed: string
+          current: string
+          downloadFailed: string
+          downloading: string
+          downloadingUnknown: string
+          failed: string
+          hint: string
+          install: string
+          installFailed: string
+          installing: string
+          later: string
+          latest: string
+          noNotes: string
+          notes: string
+          portable: string
+          restart: string
+          restartFailed: string
+          retry: string
+          title: string
+          view: string
         }
       }
     }

@@ -140,6 +140,9 @@
       "about": "About",
       "preferences": "Preferences",
       "copyWechat": "Copy WeChat ID",
+      "addWechat": "Add support on WeChat",
+      "feedback": "Feedback",
+      "feedbackHint": "Report a problem",
       "wechatCopied": "WeChat ID PewPew_VPN copied"
     },
     "account": {
@@ -158,7 +161,7 @@
       "daysLeft": "Days left: {{count}}",
       "usedOfTotal": "{{used}} of {{total}} used",
       "usage": "Data usage",
-      "contactSupport": "Copy support WeChat to renew",
+      "contactSupport": "Add support on WeChat to renew",
       "renewHint": "After renewing, click Update Routes below to refresh your plan."
     },
     "compatibility": {
@@ -186,8 +189,11 @@
       "supported": "Declared support",
       "unsupported": "Disabled",
       "unknown": "Unknown",
-      "voice": "Voice connectivity",
-      "notTested": "Not tested",
+      "port": "Local proxy port",
+      "portListening": "{{port}} OK",
+      "portBusy": "{{port}} is used by another program",
+      "otherApps": "Other proxy apps",
+      "noOtherApps": "None found",
       "standardHint": "Works for browsers and most apps",
       "enhancedHint": "For games, Discord voice and apps that ignore the system proxy. Needs permission the first time.",
       "serviceUnavailable": "The background service isn't ready. Enhanced mode needs system permission. Please try again.",
@@ -320,6 +326,76 @@
       "noneSelected": "No route selected yet. One will be chosen when you connect.",
       "invalidWhileConnected": "No valid route is selected. Pick a route from the list.",
       "switchedToSmart": "Direct mode skips the routes, so Smart Mode was turned on."
+    },
+    "support": {
+      "wechatTitle": "Add Support on WeChat",
+      "feedbackTitle": "Report a Problem",
+      "scanHint": "Scan with WeChat to add our support account",
+      "wechatId": "WeChat ID {{id}}",
+      "copyId": "Copy ID",
+      "copied": "Copied",
+      "copying": "Copying diagnostics…",
+      "diagnosticsCopied": "Diagnostics copied to the clipboard",
+      "diagnosticsFailed": "Diagnostics weren't copied",
+      "copyAgain": "Copy again",
+      "stepScan": "Scan the code with WeChat to add support",
+      "stepDescribe": "Describe the problem, then paste the diagnostics (Ctrl+V)"
+    },
+    "conflict": {
+      "title": "Possible Conflict Found",
+      "apps": "Other proxy software is running: {{apps}}. We recommend quitting it from the system tray or menu bar before connecting to PewPew to avoid system proxy or enhanced-mode conflicts. You can still choose to connect without closing it.",
+      "port": "Local proxy port {{port}} is used by another program. PewPew will switch to a free port and connect.",
+      "continue": "Connect Anyway",
+      "switchAndConnect": "Switch Port and Connect",
+      "portSwitched": "Port {{from}} was taken, so PewPew now uses {{to}}",
+      "portSwitchFailed": "No free port found. Quit other proxy apps and try again."
+    },
+    "update": {
+      "check": "Check for Updates",
+      "checking": "Checking for updates…",
+      "latest": "You're up to date",
+      "failed": "Couldn't check for updates. Try again later.",
+      "available": "Version {{version}} is available",
+      "view": "View",
+      "badge": "Update available",
+      "title": "Update to {{version}}",
+      "current": "Current version {{version}}",
+      "notes": "What's New",
+      "noNotes": "This update includes fixes and improvements.",
+      "hint": "Updating disconnects briefly. When it finishes, the client restarts and restores your connection.",
+      "later": "Later",
+      "install": "Update Now",
+      "retry": "Retry",
+      "downloading": "Downloading {{percent}}%",
+      "downloadingUnknown": "Downloading…",
+      "installing": "Installing. The client will restart…",
+      "downloadFailed": "Download failed. Check your network and try again.",
+      "installFailed": "The installer didn't start. The client will restart to restore your connection.",
+      "cleanupFailed": "Couldn't safely stop the connection. Installation was cancelled. The client will restart to restore your connection.",
+      "restartFailed": "Automatic restart failed. Quit from the tray, then reopen the client.",
+      "restart": "Restart Client",
+      "portable": "Portable builds can't update themselves. Download the new version and replace this one."
+    },
+    "discord": {
+      "label": "Discord route",
+      "following": "Following current rules; no better route confirmed",
+      "testing": "Checking UDP stability and upload",
+      "selected": "Probe-selected: {{route}} (new connections)",
+      "manual": "Following your selection until reconnect"
+    },
+    "speedTest": {
+      "button": "Speed Test",
+      "title": "Route Speed Test",
+      "download": "download",
+      "connecting": "Connecting to the test server…",
+      "testing": "Testing…",
+      "again": "Test Again",
+      "stop": "Stop",
+      "failed": "The test failed. Make sure you're connected and try again.",
+      "direct": "This test did not use your route: the routing rules sent the test server direct, so it measured your local line. Switch to Global mode and test again to measure the route.",
+      "latency": "Latency {{delay}}",
+      "dataUsed": "Used about {{size}} of data",
+      "hint": "The test runs through your current route and downloads from a Cloudflare test server for up to 8 seconds. It uses data from your plan."
     }
   }
 }

@@ -8,9 +8,20 @@ pub mod network {
         pub const DEFAULT_REDIR: u16 = 7895;
         #[cfg(target_os = "linux")]
         pub const DEFAULT_TPROXY: u16 = 7896;
-        pub const DEFAULT_MIXED: u16 = 7897;
-        pub const DEFAULT_SOCKS: u16 = 7898;
-        pub const DEFAULT_HTTP: u16 = 7899;
+        // PewPew's own defaults, so it can run while Clash Verge holds 7897-7899.
+        pub const DEFAULT_MIXED: u16 = 7966;
+        pub const DEFAULT_SOCKS: u16 = 7967;
+        pub const DEFAULT_HTTP: u16 = 7968;
+
+        // Clash Verge's defaults, which earlier PewPew versions also used.
+        pub const LEGACY_MIXED: u16 = 7897;
+        pub const LEGACY_SOCKS: u16 = 7898;
+        pub const LEGACY_HTTP: u16 = 7899;
+
+        /// Moves a port that still has the shared Clash Verge default to PewPew's own.
+        pub const fn migrate_legacy(port: u16, legacy: u16, default: u16) -> u16 {
+            if port == legacy { default } else { port }
+        }
 
         #[cfg(not(feature = "verge-dev"))]
         pub const SINGLETON_SERVER: u16 = 33331;

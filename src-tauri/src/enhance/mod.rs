@@ -645,6 +645,7 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     config = cleanup_proxy_groups(config);
 
     config = use_tun(config, enable_tun);
+    config = crate::discord_probe::inject(config, enable_tun);
     config = use_sort(config);
 
     // dns settings

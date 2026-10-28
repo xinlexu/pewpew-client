@@ -3,6 +3,7 @@ import {
   type CheckOptions,
   type Update,
 } from '@tauri-apps/plugin-updater'
+import { getBaseConfig } from 'tauri-plugin-mihomo-api'
 
 import { version as appVersion } from '@root/package.json'
 
@@ -150,6 +151,30 @@ export const checkUpdateSafe = async (
   }
 
   return result
+}
+
+const UPDATE_CHECK_TIMEOUT_MS = 15_000
+
+// Checks PewPew's GitHub update channel. GitHub is often unreachable directly,
+// so the request first goes through PewPew's own core, then directly.
+export const checkForPewPewUpdate = async (): Promise<Update | null> => {
+  const port = await getBaseConfig()
+    .then((config) => config.mixedPort)
+    .catch(() => 0)
+  const attempts: CheckOptions[] =
+    port > 0 ? [{ proxy: `http://127.0.0.1:${port}` }, {}] : [{}]
+  let lastError: unknown = new Error('pewpew-update-check-failed')
+  for (const options of attempts) {
+    try {
+      return await checkUpdateSafe({
+        ...options,
+        timeout: UPDATE_CHECK_TIMEOUT_MS,
+      })
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
 }
 
 export type { CheckOptions }

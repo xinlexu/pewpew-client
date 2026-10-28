@@ -45,6 +45,7 @@ import {
 import { showNotice } from '@/services/notice-service'
 import { debugLog } from '@/utils/debug'
 import getSystem from '@/utils/get-system'
+import { PEWPEW_DEFAULT_MIXED_PORT } from '@/utils/pewpew-ports'
 
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
@@ -189,7 +190,10 @@ export const SysproxyViewer = forwardRef<DialogRef>((props, ref) => {
 
     if (isPacMode) {
       const host = value.proxy_host || '127.0.0.1'
-      const port = verge?.verge_mixed_port || clashConfig.mixedPort || 7897
+      const port =
+        verge?.verge_mixed_port ||
+        clashConfig.mixedPort ||
+        PEWPEW_DEFAULT_MIXED_PORT
       return `${host}:${port}`
     } else {
       return systemProxyAddress

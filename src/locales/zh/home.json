@@ -140,6 +140,9 @@
       "about": "关于",
       "preferences": "偏好设置",
       "copyWechat": "复制客服微信号",
+      "addWechat": "扫码添加客服微信",
+      "feedback": "反馈",
+      "feedbackHint": "反馈问题",
       "wechatCopied": "已复制客服微信号 PewPew_VPN"
     },
     "account": {
@@ -158,7 +161,7 @@
       "daysLeft": "还剩 {{count}} 天",
       "usedOfTotal": "已用 {{used}} / 共 {{total}}",
       "usage": "流量使用情况",
-      "contactSupport": "复制客服微信，联系续费",
+      "contactSupport": "添加客服微信，联系续费",
       "renewHint": "续费后点击下方的“更新线路”刷新账户状态"
     },
     "compatibility": {
@@ -186,8 +189,11 @@
       "supported": "声明支持",
       "unsupported": "未启用",
       "unknown": "未知",
-      "voice": "语音连通性",
-      "notTested": "尚未实测",
+      "port": "本地代理端口",
+      "portListening": "{{port}} 正常",
+      "portBusy": "{{port}} 被其他程序占用",
+      "otherApps": "其他代理软件",
+      "noOtherApps": "未发现",
       "standardHint": "适合浏览器和大多数应用",
       "enhancedHint": "适合游戏、Discord 语音等不走系统代理的应用，首次使用需要授权",
       "serviceUnavailable": "后台服务还没准备好。增强兼容需要系统授权，请重试",
@@ -320,6 +326,76 @@
       "noneSelected": "还没有选择线路，连接时会自动选择",
       "invalidWhileConnected": "当前没有选中有效线路，请在右侧选择线路",
       "switchedToSmart": "直连模式不经过线路，已切换到智能模式"
+    },
+    "support": {
+      "wechatTitle": "添加客服微信",
+      "feedbackTitle": "反馈问题",
+      "scanHint": "微信扫一扫，添加客服为好友",
+      "wechatId": "微信号 {{id}}",
+      "copyId": "复制微信号",
+      "copied": "已复制",
+      "copying": "正在复制诊断信息…",
+      "diagnosticsCopied": "诊断信息已复制到剪贴板",
+      "diagnosticsFailed": "诊断信息没有复制成功",
+      "copyAgain": "重新复制",
+      "stepScan": "用微信扫码，添加客服为好友",
+      "stepDescribe": "说明遇到的问题，再粘贴诊断信息（Ctrl+V）发给客服"
+    },
+    "conflict": {
+      "title": "检测到可能的冲突",
+      "apps": "检测到其他代理软件正在运行：{{apps}}。建议先从系统托盘或菜单栏退出这些软件，再连接 PewPew，以免系统代理或增强兼容模式发生冲突。暂时不方便关闭，也可以选择仍然连接。",
+      "port": "本地代理端口 {{port}} 已被其他程序占用。PewPew 会换一个空闲端口再连接。",
+      "continue": "仍然连接",
+      "switchAndConnect": "换端口并连接",
+      "portSwitched": "端口 {{from}} 被占用，已改用 {{to}}",
+      "portSwitchFailed": "没有找到空闲端口。请退出其他代理软件后重试"
+    },
+    "update": {
+      "check": "检查更新",
+      "checking": "正在检查更新…",
+      "latest": "已是最新版本",
+      "failed": "检查更新失败，请稍后再试",
+      "available": "发现新版本 {{version}}",
+      "view": "查看",
+      "badge": "有新版本",
+      "title": "更新到 {{version}}",
+      "current": "当前版本 {{version}}",
+      "notes": "更新内容",
+      "noNotes": "本次更新包含问题修复和体验改进。",
+      "hint": "更新时会先断开连接；安装完成后客户端会自动重启，并恢复之前的连接。",
+      "later": "稍后",
+      "install": "立即更新",
+      "retry": "重试",
+      "downloading": "正在下载 {{percent}}%",
+      "downloadingUnknown": "正在下载…",
+      "installing": "正在安装，客户端会自动重启…",
+      "downloadFailed": "下载更新失败，请检查网络后重试",
+      "installFailed": "安装程序没有启动，客户端将重启以恢复连接",
+      "cleanupFailed": "更新前未能安全停止连接，已取消安装，客户端将重启以恢复连接",
+      "restartFailed": "自动重启失败，请从托盘退出后重新打开客户端",
+      "restart": "重启客户端",
+      "portable": "便携版不能自动更新，请下载新版本手动替换"
+    },
+    "discord": {
+      "label": "Discord 线路",
+      "following": "跟随当前分流，暂无更优线路证据",
+      "testing": "正在短测 UDP 稳定性与上传",
+      "selected": "短测择优：{{route}}（新连接生效）",
+      "manual": "跟随手动选择，本次连接不再自动切换"
+    },
+    "speedTest": {
+      "button": "测速",
+      "title": "线路测速",
+      "download": "下载",
+      "connecting": "正在连接测速服务器…",
+      "testing": "正在测速…",
+      "again": "再测一次",
+      "stop": "停止",
+      "failed": "测速失败。请确认已经连接，稍后再试。",
+      "direct": "这次测速没有经过线路：分流规则让测速服务器直连，测到的是本地宽带速度。切到全局模式再测，就是线路速度。",
+      "latency": "延迟 {{delay}}",
+      "dataUsed": "用掉约 {{size}} 流量",
+      "hint": "测速经过当前线路，从 Cloudflare 测速服务器下载，最长 8 秒，会消耗套餐流量。"
     }
   }
 }

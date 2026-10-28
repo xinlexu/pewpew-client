@@ -57,6 +57,13 @@ mockIPC(
         return structuredClone(state.config)
       case 'is_service_available':
         return !state.failPrepare
+      case 'detect_proxy_conflicts':
+        return { apps: [] }
+      case 'get_discord_probe_status':
+        return {
+          state: params.get('discordState') || 'following',
+          route: 'Test route',
+        }
       case 'prepare_enhanced_connection':
         if (state.failPrepare) throw new Error('pewpew-service-conflict')
         return

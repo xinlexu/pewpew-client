@@ -1,11 +1,17 @@
 import {
   BuildRounded,
+  CheckCircleRounded,
+  CheckRounded,
   CloseRounded,
   ContentCopyRounded,
+  ErrorOutlineRounded,
+  RateReviewOutlined,
+  WarningAmberRounded,
 } from '@mui/icons-material'
 import {
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -19,24 +25,31 @@ import {
   ToggleButtonGroup,
   Typography,
   alpha,
+  keyframes,
 } from '@mui/material'
 import type { Theme } from '@mui/material/styles'
 import { useQuery } from '@tanstack/react-query'
 import { getVersion } from '@tauri-apps/api/app'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import pewpewLogo from '@/assets/pewpew-logo.jpg'
+import wechatQr from '@/assets/pewpew-wechat-qr.png'
 import {
   PEWPEW_WECHAT_ID,
+  WECHAT_GREEN,
   brandColor,
   copyToClipboard,
   dialogBackdropSx,
   dialogPaperSx,
+  hairlineColor,
+  isLightTheme,
   pillButtonSx,
+  reducedMotion,
   segmentedControlSx,
 } from '@/components/home/pewpew-ui'
+import { UpdateStatus } from '@/components/home/pewpew-update'
 import { useI18n } from '@/hooks/use-i18n'
 import { useVerge } from '@/hooks/use-verge'
 import type { ClientLanguageMode } from '@/services/i18n'
@@ -405,11 +418,15 @@ const pewpewSwitchSx = (theme: Theme) => ({
 export const AboutDialog = ({
   open,
   onClose,
-  onCopyDiagnostics,
+  onOpenWechat,
+  onFeedback,
+  onOpenUpdate,
 }: {
   open: boolean
   onClose: () => void
-  onCopyDiagnostics: () => Promise<void>
+  onOpenWechat: () => void
+  onFeedback: () => void
+  onOpenUpdate: () => void
 }) => {
   const { t } = useTranslation()
   const { data: version } = useQuery({
@@ -418,15 +435,6 @@ export const AboutDialog = ({
     staleTime: Infinity,
     enabled: open,
   })
-
-  const copyWechat = async () => {
-    try {
-      await copyToClipboard(PEWPEW_WECHAT_ID)
-      showNotice.success(t('home.pewpew.header.wechatCopied'))
-    } catch {
-      showNotice.error(t('home.pewpew.diagnostics.copyFailed'))
-    }
-  }
 
   return (
     <Dialog
@@ -471,6 +479,8 @@ export const AboutDialog = ({
               )}
             </Box>
           </Stack>
+
+          <UpdateStatus onOpenUpdate={onOpenUpdate} />
 
           <Typography variant="body2" color="text.secondary">
             {t('home.pewpew.about.description')}
@@ -534,27 +544,337 @@ export const AboutDialog = ({
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               {t('home.pewpew.about.support')}
             </Typography>
-            <Button
-              size="small"
-              startIcon={<ContentCopyRounded />}
-              onClick={() => void copyWechat()}
-              sx={pillButtonSx}
-            >
-              {t('home.pewpew.header.copyWechat')}
+            <Button size="small" onClick={onOpenWechat} sx={pillButtonSx}>
+              {t('home.pewpew.support.wechatTitle')}
             </Button>
           </Stack>
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button
-          onClick={() => void onCopyDiagnostics()}
-          startIcon={<ContentCopyRounded />}
+          onClick={onFeedback}
+          startIcon={<RateReviewOutlined />}
           sx={{ ...pillButtonSx, mr: 'auto' }}
         >
-          {t('home.pewpew.diagnostics.copy')}
+          {t('home.pewpew.support.feedbackTitle')}
         </Button>
         <Button variant="contained" onClick={onClose} sx={pillButtonSx}>
           {t('home.pewpew.about.close')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+const qrIn = keyframes`
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: none; }
+`
+
+export type SupportMode = 'wechat' | 'feedback'
+
+type DiagnosticsCopy = 'copying' | 'copied' | 'failed'
+
+// WeChat QR for support. In feedback mode it first copies the diagnostics so
+// the user can paste them into the chat.
+export const SupportDialog = ({
+  open,
+  mode,
+  onClose,
+  copyDiagnostics,
+}: {
+  open: boolean
+  mode: SupportMode
+  onClose: () => void
+  // Copies the diagnostics without a notice; resolves true when copied.
+  copyDiagnostics: () => Promise<boolean>
+}) => {
+  const { t } = useTranslation()
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsCopy>('copying')
+  const [idCopied, setIdCopied] = useState(false)
+  const copyRef = useRef(copyDiagnostics)
+  const idTimerRef = useRef<number | undefined>(undefined)
+
+  useEffect(() => {
+    copyRef.current = copyDiagnostics
+  }, [copyDiagnostics])
+
+  useEffect(() => () => window.clearTimeout(idTimerRef.current), [])
+
+  const runCopy = useCallback(async () => {
+    setDiagnostics('copying')
+    const copied = await copyRef.current().catch(() => false)
+    setDiagnostics(copied ? 'copied' : 'failed')
+  }, [])
+
+  useEffect(() => {
+    if (open && mode === 'feedback') queueMicrotask(() => void runCopy())
+  }, [mode, open, runCopy])
+
+  const copyId = async () => {
+    try {
+      await copyToClipboard(PEWPEW_WECHAT_ID)
+      setIdCopied(true)
+      window.clearTimeout(idTimerRef.current)
+      idTimerRef.current = window.setTimeout(() => setIdCopied(false), 1800)
+    } catch {
+      showNotice.error(t('home.pewpew.diagnostics.copyFailed'))
+    }
+  }
+
+  const feedback = mode === 'feedback'
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      className="pewpew-dialog"
+      slotProps={{
+        paper: { sx: dialogPaperSx },
+        backdrop: { sx: dialogBackdropSx },
+      }}
+    >
+      <DialogHeader
+        title={t(
+          feedback
+            ? 'home.pewpew.support.feedbackTitle'
+            : 'home.pewpew.support.wechatTitle',
+        )}
+        closeLabel={t('home.pewpew.about.close')}
+        onClose={onClose}
+      />
+      <DialogContent sx={{ px: { xs: 2, sm: 3 }, pb: 1 }}>
+        <Stack spacing={2} sx={{ alignItems: 'center' }}>
+          {feedback && (
+            <Stack
+              component="ol"
+              spacing={1}
+              sx={{ alignSelf: 'stretch', m: 0, pl: 0, listStyle: 'none' }}
+            >
+              <FeedbackStep index={1}>
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  role="status"
+                  sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+                >
+                  {diagnostics === 'copying' ? (
+                    <CircularProgress size={14} thickness={5} />
+                  ) : diagnostics === 'copied' ? (
+                    <CheckCircleRounded
+                      sx={{ fontSize: 18, color: 'success.main' }}
+                    />
+                  ) : (
+                    <ErrorOutlineRounded
+                      sx={{ fontSize: 18, color: 'warning.main' }}
+                    />
+                  )}
+                  <span>
+                    {t(
+                      diagnostics === 'copying'
+                        ? 'home.pewpew.support.copying'
+                        : diagnostics === 'copied'
+                          ? 'home.pewpew.support.diagnosticsCopied'
+                          : 'home.pewpew.support.diagnosticsFailed',
+                    )}
+                  </span>
+                  {diagnostics === 'failed' && (
+                    <Button
+                      size="small"
+                      onClick={() => void runCopy()}
+                      sx={{ ...pillButtonSx, minWidth: 0, py: 0 }}
+                    >
+                      {t('home.pewpew.support.copyAgain')}
+                    </Button>
+                  )}
+                </Stack>
+              </FeedbackStep>
+              <FeedbackStep index={2}>
+                {t('home.pewpew.support.stepScan')}
+              </FeedbackStep>
+              <FeedbackStep index={3}>
+                {t('home.pewpew.support.stepDescribe')}
+              </FeedbackStep>
+            </Stack>
+          )}
+
+          <Box
+            sx={(theme) => ({
+              p: 1.25,
+              borderRadius: '20px',
+              // Scanners need dark modules on white, in both themes.
+              bgcolor: '#ffffff',
+              border: `1px solid ${hairlineColor(theme)}`,
+              boxShadow: isLightTheme(theme)
+                ? '0 10px 28px rgba(40, 70, 140, 0.14) !important'
+                : '0 10px 28px rgba(0, 0, 0, 0.45) !important',
+              animation: `${qrIn} 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both`,
+              [reducedMotion]: { animation: 'none' },
+            })}
+          >
+            <Box
+              component="img"
+              src={wechatQr}
+              alt={t('home.pewpew.support.scanHint')}
+              sx={{ width: 196, height: 196, display: 'block' }}
+            />
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            {t('home.pewpew.support.scanHint')}
+          </Typography>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={(theme) => ({
+              alignItems: 'center',
+              borderRadius: 999,
+              pl: 1.5,
+              pr: 0.5,
+              py: 0.25,
+              bgcolor: alpha(WECHAT_GREEN, isLightTheme(theme) ? 0.08 : 0.12),
+            })}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {t('home.pewpew.support.wechatId', { id: PEWPEW_WECHAT_ID })}
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => void copyId()}
+              startIcon={idCopied ? <CheckRounded /> : <ContentCopyRounded />}
+              aria-live="polite"
+              sx={{
+                ...pillButtonSx,
+                color: idCopied ? 'success.main' : undefined,
+                transition: 'color 160ms ease',
+              }}
+            >
+              {t(
+                idCopied
+                  ? 'home.pewpew.support.copied'
+                  : 'home.pewpew.support.copyId',
+              )}
+            </Button>
+          </Stack>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button variant="contained" onClick={onClose} sx={pillButtonSx}>
+          {t('home.pewpew.about.close')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+const FeedbackStep = ({
+  index,
+  children,
+}: {
+  index: number
+  children: ReactNode
+}) => (
+  <Stack
+    component="li"
+    direction="row"
+    spacing={1.25}
+    sx={{ alignItems: 'flex-start' }}
+  >
+    <Box
+      aria-hidden
+      sx={(theme) => ({
+        width: 22,
+        height: 22,
+        flexShrink: 0,
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 12,
+        fontWeight: 800,
+        color: brandColor(theme),
+        bgcolor: alpha(brandColor(theme), 0.12),
+      })}
+    >
+      {index}
+    </Box>
+    <Typography
+      variant="body2"
+      component="div"
+      sx={{ pt: 0.15, lineHeight: 1.55, minWidth: 0 }}
+    >
+      {children}
+    </Typography>
+  </Stack>
+)
+
+export type ConflictPrompt = {
+  apps: string[]
+  busyPort: number | null
+}
+
+// Asks before connecting while another proxy app runs or the port is taken.
+export const ConflictDialog = ({
+  open,
+  conflict,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean
+  conflict: ConflictPrompt | null
+  onCancel: () => void
+  onConfirm: () => void
+}) => {
+  const { t, i18n } = useTranslation()
+  const apps = conflict?.apps.length
+    ? new Intl.ListFormat(i18n.language, { type: 'conjunction' }).format(
+        conflict.apps,
+      )
+    : ''
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onCancel}
+      maxWidth="xs"
+      fullWidth
+      className="pewpew-dialog"
+      slotProps={{
+        paper: { sx: dialogPaperSx },
+        backdrop: { sx: dialogBackdropSx },
+      }}
+    >
+      <DialogTitle
+        sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}
+      >
+        <WarningAmberRounded sx={{ color: 'warning.main' }} />
+        {t('home.pewpew.conflict.title')}
+      </DialogTitle>
+      <DialogContent>
+        <Stack spacing={1.25}>
+          {apps && (
+            <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+              {t('home.pewpew.conflict.apps', { apps })}
+            </Typography>
+          )}
+          {conflict?.busyPort && (
+            <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+              {t('home.pewpew.conflict.port', { port: conflict.busyPort })}
+            </Typography>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onCancel} sx={pillButtonSx}>
+          {t('shared.actions.cancel')}
+        </Button>
+        <Button variant="contained" onClick={onConfirm} sx={pillButtonSx}>
+          {t(
+            conflict?.busyPort
+              ? 'home.pewpew.conflict.switchAndConnect'
+              : 'home.pewpew.conflict.continue',
+          )}
         </Button>
       </DialogActions>
     </Dialog>

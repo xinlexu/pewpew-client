@@ -114,9 +114,22 @@ impl IClashTemp {
         let redir_port = Self::guard_redir_port(&config);
         #[cfg(target_os = "linux")]
         let tproxy_port = Self::guard_tproxy_port(&config);
-        let mixed_port = Self::guard_mixed_port(&config);
-        let socks_port = Self::guard_socks_port(&config);
-        let port = Self::guard_port(&config);
+        // Earlier versions shared Clash Verge's default ports; move them to PewPew's own.
+        let mixed_port = network::ports::migrate_legacy(
+            Self::guard_mixed_port(&config),
+            network::ports::LEGACY_MIXED,
+            network::ports::DEFAULT_MIXED,
+        );
+        let socks_port = network::ports::migrate_legacy(
+            Self::guard_socks_port(&config),
+            network::ports::LEGACY_SOCKS,
+            network::ports::DEFAULT_SOCKS,
+        );
+        let port = network::ports::migrate_legacy(
+            Self::guard_port(&config),
+            network::ports::LEGACY_HTTP,
+            network::ports::DEFAULT_HTTP,
+        );
         let ctrl = Self::guard_external_controller(&config);
         #[cfg(unix)]
         let external_controller_unix = Self::guard_external_controller_ipc();
@@ -220,10 +233,10 @@ impl IClashTemp {
                 Value::Number(val_num) => val_num.as_u64().map(|u| u as u16),
                 _ => None,
             })
-            .unwrap_or(7897);
+            .unwrap_or(network::ports::DEFAULT_MIXED);
 
         if port == 0 {
-            port = 7897;
+            port = network::ports::DEFAULT_MIXED;
         }
 
         port
@@ -237,9 +250,9 @@ impl IClashTemp {
                 Value::Number(val_num) => val_num.as_u64().map(|u| u as u16),
                 _ => None,
             })
-            .unwrap_or(7898);
+            .unwrap_or(network::ports::DEFAULT_SOCKS);
         if port == 0 {
-            port = 7898;
+            port = network::ports::DEFAULT_SOCKS;
         }
         port
     }
@@ -252,9 +265,9 @@ impl IClashTemp {
                 Value::Number(val_num) => val_num.as_u64().map(|u| u as u16),
                 _ => None,
             })
-            .unwrap_or(7899);
+            .unwrap_or(network::ports::DEFAULT_HTTP);
         if port == 0 {
-            port = 7899;
+            port = network::ports::DEFAULT_HTTP;
         }
         port
     }
@@ -349,8 +362,8 @@ fn test_clash_info() {
     fn get_result<S: Into<String>>(port: u16, server: S) -> ClashInfo {
         ClashInfo {
             mixed_port: port,
-            socks_port: 7898,
-            port: 7899,
+            socks_port: network::ports::DEFAULT_SOCKS,
+            port: network::ports::DEFAULT_HTTP,
             server: server.into(),
             secret: None,
         }
@@ -358,10 +371,19 @@ fn test_clash_info() {
 
     assert_eq!(
         IClashTemp(IClashTemp::guard(Mapping::new())).get_client_info(),
-        get_result(7897, "127.0.0.1:9097")
+        get_result(network::ports::DEFAULT_MIXED, "127.0.0.1:9097")
     );
 
-    assert_eq!(get_case("", ""), get_result(7897, "127.0.0.1:9097"));
+    assert_eq!(
+        get_case("", ""),
+        get_result(network::ports::DEFAULT_MIXED, "127.0.0.1:9097")
+    );
+
+    // Clash Verge's default from earlier versions moves to PewPew's own port.
+    assert_eq!(
+        get_case(7897, ""),
+        get_result(network::ports::DEFAULT_MIXED, "127.0.0.1:9097")
+    );
 
     assert_eq!(get_case(65537, ""), get_result(1, "127.0.0.1:9097"));
 
@@ -378,6 +400,26 @@ fn test_clash_info() {
     assert_eq!(get_case(8888, "192.168.1.1:8080"), get_result(8888, "192.168.1.1:8080"));
 
     assert_eq!(get_case(8888, "192.168.1.1:80800"), get_result(8888, "127.0.0.1:9097"));
+}
+
+#[test]
+fn legacy_socks_and_http_ports_move_to_pewpew_defaults() {
+    let mut map = Mapping::new();
+    map.insert("mixed-port".into(), 7897.into());
+    map.insert("socks-port".into(), 7898.into());
+    map.insert("port".into(), 7899.into());
+    let info = IClashTemp(IClashTemp::guard(map)).get_client_info();
+    assert_eq!(info.mixed_port, network::ports::DEFAULT_MIXED);
+    assert_eq!(info.socks_port, network::ports::DEFAULT_SOCKS);
+    assert_eq!(info.port, network::ports::DEFAULT_HTTP);
+
+    // Ports a user picked themselves stay as they are.
+    let mut map = Mapping::new();
+    map.insert("mixed-port".into(), 7890.into());
+    map.insert("socks-port".into(), 1080.into());
+    map.insert("port".into(), 8080.into());
+    let info = IClashTemp(IClashTemp::guard(map)).get_client_info();
+    assert_eq!((info.mixed_port, info.socks_port, info.port), (7890, 1080, 8080));
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import react from '@vitejs/plugin-react'
@@ -14,6 +14,11 @@ const { chromium } = await import(
     : 'playwright'
 )
 const root = fileURLToPath(new URL('../../', import.meta.url))
+const { version } = JSON.parse(
+  await readFile(path.join(root, 'package.json'), 'utf8'),
+)
+const [major, minor, patch] = version.split('.').map(Number)
+const updateVersion = `${major}.${minor}.${patch + 1}`
 const output = path.join(root, 'target', 'home-ui-checks')
 await mkdir(output, { recursive: true })
 const server = await createServer({
@@ -33,10 +38,15 @@ const browser = await chromium.launch({
   headless: true,
 })
 const results = []
+const filter = process.env.PEWPEW_UI_FILTER
+  ? new RegExp(process.env.PEWPEW_UI_FILTER)
+  : null
 const check = async (name, fn) => {
+  if (filter && !filter.test(name)) return
   const page = await browser.newPage({ viewport: { width: 940, height: 700 } })
   const errors = []
   page.setDefaultTimeout(10000)
+  page.setDefaultNavigationTimeout(60000)
   page.on('pageerror', (e) => errors.push(e.message))
   const open = async (query = '') => {
     await page.goto(`${base}?theme=light&lang=zh&${query}`)
@@ -67,6 +77,47 @@ const groupNow = (page, name) =>
     )
     return r.proxies[n]?.now
   }, name)
+
+await check(
+  'manual route selection cancels Discord optimization first',
+  async ({ page, open }) => {
+    await open('scenario=enhanced')
+    await page.getByRole('combobox').click()
+    await page.getByRole('option', { name: /香港 02/ }).click()
+    await page.waitForFunction(() =>
+      window.homeTest.calls.some(
+        (call) =>
+          call.command === 'plugin:mihomo|select_node_for_group' &&
+          call.args.node === '🇭🇰 香港 02',
+      ),
+    )
+    const commands = await page.evaluate(() =>
+      window.homeTest.calls.map((call) => call.command),
+    )
+    assert.ok(commands.indexOf('follow_manual_discord_route') >= 0)
+    assert.ok(
+      commands.indexOf('follow_manual_discord_route') <
+        commands.indexOf('plugin:mihomo|select_node_for_group'),
+    )
+  },
+)
+
+await check(
+  'failed Discord reset does not apply a contradictory manual route',
+  async ({ page, open }) => {
+    await open('scenario=enhanced&discordResetFails')
+    await page.getByRole('combobox').click()
+    await page.getByRole('option', { name: /香港 02/ }).click()
+    await page.getByText('线路切换失败，请稍后重试或联系客服').waitFor()
+    const commands = await page.evaluate(() =>
+      window.homeTest.calls.map((call) => call.command),
+    )
+    assert.equal(
+      commands.includes('plugin:mihomo|select_node_for_group'),
+      false,
+    )
+  },
+)
 
 for (const failure of ['failSelection', 'ignoreSelection']) {
   await check(
@@ -131,17 +182,18 @@ await check(
         (c) => c.command === 'plugin:mihomo|select_node_for_group',
       ),
     )
-    assert.ok(
-      await page
-        .getByRole('button', { name: '连接', exact: true })
-        .isDisabled(),
-    )
-    assert.ok(
-      await page
-        .getByRole('button', { name: '导入线路', exact: true })
-        .isDisabled(),
-    )
-    assert.ok(await page.getByRole('combobox').isDisabled())
+    // The busy state renders a moment after the request starts; it must
+    // arrive while the 700 ms selection is still pending.
+    for (const control of [
+      page.getByRole('button', { name: '连接', exact: true }),
+      page.getByRole('button', { name: '导入线路', exact: true }),
+      page.getByRole('combobox'),
+    ]) {
+      await control
+        .and(page.locator(':disabled, [aria-disabled="true"]'))
+        .waitFor({ timeout: 500 })
+    }
+    assert.equal((await state()).config.mode, 'rule')
     await page.waitForFunction(
       () => window.homeTest.state.config.mode === 'global',
     )
@@ -449,13 +501,407 @@ await check(
   },
 )
 
+const clipboardWrites = (page) =>
+  page.evaluate(() =>
+    window.homeTest.calls
+      .filter((c) => c.command === 'plugin:clipboard-manager|write_text')
+      .map((c) => c.args.text),
+  )
+const commandsIn = (page, names) =>
+  page.evaluate(
+    (list) =>
+      window.homeTest.calls
+        .map((c) => c.command)
+        .filter((c) => list.includes(c)),
+    names,
+  )
+
+await check('wechat chip opens the support QR code', async ({ page, open }) => {
+  await open()
+  await page.getByRole('button', { name: /微信 PewPew_VPN/ }).click()
+  const dialog = page.getByRole('dialog', { name: '添加客服微信' })
+  const qr = dialog.getByRole('img', { name: '微信扫一扫，添加客服为好友' })
+  await qr.waitFor()
+  assert.ok(await qr.evaluate((img) => img.complete && img.naturalWidth > 0))
+  await dialog.getByRole('button', { name: '复制微信号' }).click()
+  await dialog.getByRole('button', { name: '已复制' }).waitFor()
+  assert.deepEqual(await clipboardWrites(page), ['PewPew_VPN'])
+})
+
 await check(
-  'wechat chip copies the support ID',
-  async ({ page, open, toasts }) => {
+  'feedback copies the diagnostics and shows the QR code',
+  async ({ page, open }) => {
+    await open('otherApps=Clash Verge')
+    await page.getByRole('button', { name: '反馈问题' }).click()
+    const dialog = page.getByRole('dialog', { name: '反馈问题' })
+    await dialog.getByText('诊断信息已复制到剪贴板').waitFor()
+    const [text] = await clipboardWrites(page)
+    assert.match(text, /Local proxy port: 7966 \(listening\)/)
+    assert.match(text, /Other proxy apps: Clash Verge/)
+    assert.doesNotMatch(text, /Voice/)
+    assert.ok(
+      await dialog
+        .getByRole('img', { name: '微信扫一扫，添加客服为好友' })
+        .isVisible(),
+    )
+  },
+)
+
+await check(
+  'connection check lists the proxy port and other apps, not voice',
+  async ({ page, open }) => {
+    await open('scenario=connected&otherApps=Clash Verge')
+    await page.getByRole('button', { name: '检查连接' }).click()
+    const dialog = page.getByRole('dialog', { name: '检查连接' })
+    await dialog.getByText('7966 正常').waitFor()
+    assert.ok(
+      await dialog.getByText('其他代理软件', { exact: true }).isVisible(),
+    )
+    assert.ok(
+      await dialog
+        .getByText(/检测到其他代理软件正在运行：Clash Verge/)
+        .isVisible(),
+    )
+    assert.equal(await dialog.getByText('语音连通性').count(), 0)
+  },
+)
+
+await check(
+  'another proxy app is mentioned before connecting',
+  async ({ page, open, state }) => {
+    await open('otherApps=Clash Verge')
+    const connect = page.getByRole('button', { name: '连接', exact: true })
+    const dialog = page.getByRole('dialog', { name: '检测到可能的冲突' })
+    await connect.click()
+    await dialog.getByText(/检测到其他代理软件正在运行：Clash Verge/).waitFor()
+    await dialog.getByRole('button', { name: '取消' }).click()
+    await dialog.waitFor({ state: 'hidden' })
+    assert.equal((await state()).system.enable, false)
+    assert.equal(await page.getByText('连接失败', { exact: true }).count(), 0)
+
+    await connect.click()
+    await dialog.getByRole('button', { name: '仍然连接' }).click()
+    await page.getByText('已连接', { exact: true }).waitFor()
+
+    // The same app is not asked about again in this session.
+    await page.getByRole('button', { name: '断开连接', exact: true }).click()
+    await page.getByText('未连接', { exact: true }).waitFor()
+    await connect.click()
+    await page.getByText('已连接', { exact: true }).waitFor()
+    assert.equal(
+      (await commandsIn(page, ['detect_proxy_conflicts'])).length >= 3,
+      true,
+    )
+  },
+)
+
+await check(
+  'a taken proxy port moves to a free one before connecting',
+  async ({ page, open, state, toasts }) => {
+    await open('portBusy')
+    await page.getByRole('button', { name: '连接', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '检测到可能的冲突' })
+    await dialog.getByText(/本地代理端口 7966 已被其他程序占用/).waitFor()
+    await dialog.getByRole('button', { name: '换端口并连接' }).click()
+    await page.getByText('已连接', { exact: true }).waitFor()
+    const after = await state()
+    assert.equal(after.verge.verge_mixed_port, 7969)
+    assert.equal(after.config.mixedPort, 7969)
+    assert.equal(after.system.server, '127.0.0.1:7969')
+    assert.ok(
+      (await toasts()).some((t) => t.includes('端口 7966 被占用，已改用 7969')),
+    )
+    const patches = await commandsIn(page, [
+      'patch_clash_config',
+      'patch_verge_config',
+    ])
+    assert.equal(patches[0], 'patch_clash_config')
+  },
+)
+
+await check(
+  'no free proxy port stops the connection with a clear notice',
+  async ({ page, open, state, toasts }) => {
+    await open('portBusy&noFreePort')
+    await page.getByRole('button', { name: '连接', exact: true }).click()
+    await page
+      .getByRole('dialog', { name: '检测到可能的冲突' })
+      .getByRole('button', { name: '换端口并连接' })
+      .click()
+    await page.getByText('连接失败', { exact: true }).waitFor()
+    assert.equal((await state()).system.enable, false)
+    assert.ok((await toasts()).some((t) => t.includes('没有找到空闲端口')))
+  },
+)
+
+const openSpeedTest = async (page) => {
+  await page.getByRole('button', { name: '测速', exact: true }).click()
+  return page.getByRole('dialog', { name: '线路测速' })
+}
+
+await check(
+  'the speed test shows the route speed and the data it used',
+  async ({ page, open }) => {
     await open()
-    await page.getByRole('button', { name: /微信 PewPew_VPN/ }).click()
-    await page.waitForTimeout(400)
-    assert.ok((await toasts()).some((t) => t.includes('已复制客服微信号')))
+    assert.equal(
+      await page.getByRole('button', { name: '测速', exact: true }).count(),
+      0,
+      'speed test is only offered while connected',
+    )
+    await page.goto('about:blank')
+    await open('scenario=connected')
+    const dialog = await openSpeedTest(page)
+    await dialog.getByText('186', { exact: true }).waitFor()
+    assert.ok(await dialog.getByText('用掉约 150 MB 流量').isVisible())
+    assert.ok(
+      await dialog.getByRole('button', { name: '再测一次' }).isEnabled(),
+    )
+    assert.equal(await dialog.getByText(/没有经过线路/).count(), 0)
+  },
+)
+
+await check('closing a running speed test stops it', async ({ page, open }) => {
+  await open('scenario=connected&speedSlow')
+  const dialog = await openSpeedTest(page)
+  await dialog.getByText('正在测速…').waitFor()
+  await dialog.getByRole('button', { name: '停止' }).click()
+  await dialog.waitFor({ state: 'hidden' })
+  assert.deepEqual(await commandsIn(page, ['cancel_speed_test']), [
+    'cancel_speed_test',
+  ])
+})
+
+await check(
+  'a speed test that the rules send direct says so',
+  async ({ page, open }) => {
+    await open('scenario=connected&speedDirect')
+    const dialog = await openSpeedTest(page)
+    await dialog.getByText(/没有经过线路/).waitFor()
+  },
+)
+
+await check('a failed speed test can be retried', async ({ page, open }) => {
+  await open('scenario=connected&speedFails')
+  const dialog = await openSpeedTest(page)
+  await dialog.getByText('测速失败。请确认已经连接，稍后再试。').waitFor()
+  await dialog.getByRole('button', { name: '再测一次' }).click()
+  await dialog.getByText('测速失败。请确认已经连接，稍后再试。').waitFor()
+  assert.equal((await commandsIn(page, ['run_speed_test'])).length, 2)
+})
+
+await check(
+  'reopening a cancelled speed test waits for the previous run',
+  async ({ page, open }) => {
+    await open('scenario=connected&speedSlow&speedCancelSlow')
+    const dialog = await openSpeedTest(page)
+    await page.waitForFunction(() =>
+      window.homeTest.calls.some((c) => c.command === 'run_speed_test'),
+    )
+    await dialog.getByRole('button', { name: '停止' }).click()
+    await dialog.waitFor({ state: 'hidden' })
+    const reopened = await openSpeedTest(page)
+    await reopened.getByText('186', { exact: true }).waitFor()
+    assert.equal(
+      await reopened.getByText('测速失败。请确认已经连接，稍后再试。').count(),
+      0,
+    )
+  },
+)
+
+const openAbout = async (page) => {
+  await page.getByRole('button', { name: '关于', exact: true }).click()
+  return page.getByRole('dialog', { name: '关于 / 开源许可' })
+}
+
+await check(
+  'an update is downloaded, then the network is restored, then installed',
+  async ({ page, open }) => {
+    await open(`update=${updateVersion}`)
+    const about = await openAbout(page)
+    await about.getByRole('button', { name: '检查更新' }).click()
+    await about.getByText(`发现新版本 ${updateVersion}`).waitFor()
+    // The header sits behind the open dialog, so it is aria-hidden for now.
+    assert.equal(
+      await page
+        .getByRole('button', { name: '关于 · 有新版本', includeHidden: true })
+        .count(),
+      1,
+    )
+    await about.getByRole('button', { name: '查看' }).click()
+    const dialog = page.getByRole('dialog', { name: `更新到 ${updateVersion}` })
+    await dialog.getByText('修复与 Clash Verge 同时运行时全部超时').waitFor()
+    await dialog.getByRole('button', { name: '立即更新' }).click()
+    await dialog.getByText('正在安装，客户端会自动重启…').waitFor()
+    assert.deepEqual(
+      await commandsIn(page, [
+        'plugin:updater|download',
+        'prepare_update_install',
+        'plugin:updater|install',
+        'restart_app',
+      ]),
+      [
+        'plugin:updater|download',
+        'prepare_update_install',
+        'plugin:updater|install',
+        'restart_app',
+      ],
+    )
+    const checkArgs = await page.evaluate(
+      () =>
+        window.homeTest.calls.find((c) => c.command === 'plugin:updater|check')
+          .args,
+    )
+    assert.equal(checkArgs.proxy, 'http://127.0.0.1:7966')
+  },
+)
+
+await check(
+  'a background check marks About and mentions the new version once',
+  async ({ page, open, toasts }) => {
+    await open(`update=${updateVersion}`)
+    const about = page.getByRole('button', { name: '关于 · 有新版本' })
+    await about.waitFor({ timeout: 15000 })
+    assert.ok(
+      (await toasts()).some((t) => t.includes(`发现新版本 ${updateVersion}`)),
+    )
+    assert.equal(
+      await page.evaluate(() =>
+        localStorage.getItem('pewpew-update-notified-version'),
+      ),
+      updateVersion,
+    )
+  },
+)
+
+await check(
+  'daily update checks continue without restarting the client',
+  async ({ page, open }) => {
+    await page.clock.install()
+    await open()
+    await page.clock.fastForward(10_000)
+    await page.waitForFunction(() =>
+      window.homeTest.calls.some((c) => c.command === 'plugin:updater|check'),
+    )
+    await page.waitForTimeout(100)
+    const before = (await commandsIn(page, ['plugin:updater|check'])).length
+    await page.clock.fastForward(24 * 60 * 60 * 1000 + 10_000)
+    await page.waitForFunction(
+      (count) =>
+        window.homeTest.calls.filter(
+          (c) => c.command === 'plugin:updater|check',
+        ).length > count,
+      before,
+    )
+  },
+)
+
+await check(
+  'cleanup failure never starts the installer',
+  async ({ page, open }) => {
+    await open(`update=${updateVersion}&cleanupFails`)
+    const about = await openAbout(page)
+    await about.getByRole('button', { name: '检查更新' }).click()
+    await about.getByRole('button', { name: '查看' }).click()
+    const dialog = page.getByRole('dialog', { name: `更新到 ${updateVersion}` })
+    await dialog.getByRole('button', { name: '立即更新' }).click()
+    await page.waitForFunction(() =>
+      window.homeTest.calls.some((c) => c.command === 'prepare_update_install'),
+    )
+    await page.waitForTimeout(200)
+    assert.deepEqual(await commandsIn(page, ['plugin:updater|install']), [])
+    assert.deepEqual(await commandsIn(page, ['restart_app']), ['restart_app'])
+  },
+)
+
+await check(
+  'failed update recovery leaves a usable dialog',
+  async ({ page, open }) => {
+    await open(`update=${updateVersion}&installFails&restartFails`)
+    const about = await openAbout(page)
+    await about.getByRole('button', { name: '检查更新' }).click()
+    await about.getByRole('button', { name: '查看' }).click()
+    const dialog = page.getByRole('dialog', { name: `更新到 ${updateVersion}` })
+    await dialog.getByRole('button', { name: '立即更新' }).click()
+    await page.waitForFunction(() =>
+      window.homeTest.calls.some((c) => c.command === 'restart_app'),
+    )
+    await dialog
+      .getByText('自动重启失败，请从托盘退出后重新打开客户端')
+      .waitFor()
+    await dialog.getByRole('button', { name: '重启客户端' }).click()
+    await page.waitForFunction(
+      () =>
+        window.homeTest.calls.filter((c) => c.command === 'restart_app')
+          .length === 2,
+    )
+    assert.equal((await commandsIn(page, ['plugin:updater|install'])).length, 1)
+    await dialog.getByRole('button', { name: '稍后' }).click()
+    await dialog.waitFor({ state: 'hidden' })
+  },
+)
+
+await check(
+  'the About dialog reports an up-to-date client',
+  async ({ page, open }) => {
+    await open()
+    const about = await openAbout(page)
+    await about.getByRole('button', { name: '检查更新' }).click()
+    await about.getByText('已是最新版本').waitFor()
+  },
+)
+
+await check(
+  'a failed update check tries the proxy, then direct, then says so',
+  async ({ page, open }) => {
+    await open('updateCheckFails')
+    const about = await openAbout(page)
+    await about.getByRole('button', { name: '检查更新' }).click()
+    await about.getByText('检查更新失败，请稍后再试').waitFor()
+    const proxies = await page.evaluate(() =>
+      window.homeTest.calls
+        .filter((c) => c.command === 'plugin:updater|check')
+        .map((c) => c.args.proxy ?? null),
+    )
+    assert.deepEqual(proxies, ['http://127.0.0.1:7966', null])
+  },
+)
+
+await check(
+  'an installer that does not start restarts the client to restore it',
+  async ({ page, open, toasts }) => {
+    await open(`update=${updateVersion}&installFails`)
+    const about = await openAbout(page)
+    await about.getByRole('button', { name: '检查更新' }).click()
+    await about.getByRole('button', { name: '查看' }).click()
+    await page
+      .getByRole('dialog', { name: `更新到 ${updateVersion}` })
+      .getByRole('button', { name: '立即更新' })
+      .click()
+    await page.waitForFunction(() =>
+      window.homeTest.calls.some((c) => c.command === 'restart_app'),
+    )
+    assert.ok((await toasts()).some((t) => t.includes('安装程序没有启动')))
+  },
+)
+
+await check(
+  'a failed download keeps the client running and offers a retry',
+  async ({ page, open }) => {
+    await open(`update=${updateVersion}&downloadFails`)
+    const about = await openAbout(page)
+    await about.getByRole('button', { name: '检查更新' }).click()
+    await about.getByRole('button', { name: '查看' }).click()
+    const dialog = page.getByRole('dialog', { name: `更新到 ${updateVersion}` })
+    await dialog.getByRole('button', { name: '立即更新' }).click()
+    await dialog.getByText('下载更新失败，请检查网络后重试').waitFor()
+    assert.ok(await dialog.getByRole('button', { name: '重试' }).isEnabled())
+    assert.deepEqual(
+      await commandsIn(page, [
+        'prepare_update_install',
+        'plugin:updater|install',
+      ]),
+      [],
+    )
   },
 )
 
@@ -594,6 +1040,7 @@ for (const [name, query, width, height] of [
   ['long-dark-520', 'theme=dark&lang=en&long', 520, 520],
   ['ready-light-390', 'theme=light&lang=en', 390, 844],
 ]) {
+  if (filter) break
   const page = await browser.newPage({ viewport: { width, height } })
   await page.goto(`${base}?${query}`)
   await page.waitForSelector('.pewpew-shell')

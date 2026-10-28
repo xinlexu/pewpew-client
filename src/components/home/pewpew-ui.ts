@@ -189,9 +189,17 @@ export const segmentedControlSx = (theme: Theme) => {
   }
 }
 
+// Dialogs settle in with a small lift while the backdrop fades.
+const dialogIn = keyframes`
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+`
+
 export const dialogPaperSx = (theme: Theme) => {
   const light = isLightTheme(theme)
   return {
+    animation: `${dialogIn} 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both`,
+    [reducedMotion]: { animation: 'none' },
     borderRadius: '22px',
     backgroundImage: 'none',
     border: '1px solid',
@@ -218,10 +226,22 @@ export const dialogBackdropSx = (theme: Theme) => ({
   backdropFilter: 'blur(6px)',
 })
 
+// Buttons press in slightly, so a click is felt before the result shows.
+const pressTransition = [
+  'background-color 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+  'box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+  'border-color 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+  'color 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+  'transform 120ms ease',
+].join(', ')
+
 export const pillButtonSx = {
   borderRadius: 999,
   fontWeight: 700,
   textTransform: 'none',
+  transition: pressTransition,
+  '&:active:not(.Mui-disabled)': { transform: 'scale(0.97)' },
+  [reducedMotion]: { '&:active:not(.Mui-disabled)': { transform: 'none' } },
 } as const
 
 // Outlined pill that keeps a light glass fill on translucent cards.

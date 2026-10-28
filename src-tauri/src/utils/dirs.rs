@@ -219,22 +219,28 @@ pub fn ensure_mihomo_safe_dir() -> Option<PathBuf> {
         })
 }
 
+// The core's control channel must not be shared with other Clash clients:
+// Clash Verge used `verge-mihomo` for the same purpose, and whichever app
+// started second ended up controlling the other app's core.
 #[cfg(unix)]
 pub fn ipc_path() -> Result<PathBuf> {
     ensure_mihomo_safe_dir()
-        .map(|base_dir| base_dir.join("verge").join("verge-mihomo.sock"))
-        .or_else(|| {
-            app_home_dir()
-                .ok()
-                .map(|dir| dir.join("verge").join("verge-mihomo.sock"))
-        })
+        .map(|base_dir| base_dir.join("pewpew").join(IPC_NAME_UNIX))
+        .or_else(|| app_home_dir().ok().map(|dir| dir.join("pewpew").join(IPC_NAME_UNIX)))
         .ok_or_else(|| anyhow::anyhow!("Failed to determine ipc path"))
 }
 
+#[cfg(unix)]
+const IPC_NAME_UNIX: &str = "pewpew-mihomo.sock";
+
 #[cfg(target_os = "windows")]
 pub fn ipc_path() -> Result<PathBuf> {
-    Ok(PathBuf::from(r"\\.\pipe\verge-mihomo"))
+    Ok(PathBuf::from(IPC_PIPE_WINDOWS))
 }
+
+#[cfg(any(target_os = "windows", test))]
+const IPC_PIPE_WINDOWS: &str = r"\\.\pipe\pewpew-mihomo";
+
 #[async_trait]
 pub trait PathBufExec {
     async fn remove_if_exists(&self) -> Result<()>;
@@ -248,5 +254,20 @@ impl PathBufExec for PathBuf {
             logging!(info, Type::File, "Removed file: {:?}", self);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod ipc_name_tests {
+    #[test]
+    fn control_pipe_is_not_shared_with_clash_verge() {
+        assert_eq!(super::IPC_PIPE_WINDOWS, r"\\.\pipe\pewpew-mihomo");
+        assert!(!super::IPC_PIPE_WINDOWS.contains("verge"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn control_socket_is_not_shared_with_clash_verge() {
+        assert!(super::ipc_path().is_ok_and(|path| path.ends_with("pewpew/pewpew-mihomo.sock")));
     }
 }

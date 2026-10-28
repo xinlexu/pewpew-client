@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { Channel, invoke } from '@tauri-apps/api/core'
 import dayjs from 'dayjs'
 import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
 
@@ -575,3 +575,58 @@ export const isPortInUse = async (port: number) => {
     return false
   }
 }
+
+export type ProxyConflicts = { apps: string[] }
+
+// Other proxy clients that compete with PewPew for the system proxy or adapter.
+export async function detectProxyConflicts() {
+  return invoke<ProxyConflicts>('detect_proxy_conflicts')
+}
+
+// A free local proxy port other than `busy`, or null when none is left.
+export async function findFreeProxyPort(busy: number) {
+  return invoke<number | null>('find_free_proxy_port', { busy })
+}
+
+// Restores the network and stops the core so the installer can replace files.
+export async function prepareUpdateInstall() {
+  return invoke<void>('prepare_update_install')
+}
+
+export type SpeedProgress = { elapsedMs: number; bytes: number; mbps: number }
+export type SpeedResult = {
+  mbps: number
+  averageMbps: number
+  bytes: number
+  elapsedMs: number
+}
+
+// Download speed through the current route; progress arrives every 200 ms.
+export async function runSpeedTest(
+  onProgress: (progress: SpeedProgress) => void,
+) {
+  const channel = new Channel<SpeedProgress>()
+  channel.onmessage = onProgress
+  return invoke<SpeedResult>('run_speed_test', { onProgress: channel })
+}
+
+export async function cancelSpeedTest() {
+  return invoke<void>('cancel_speed_test')
+}
+
+export type DiscordProbeStatus = {
+  state: 'following' | 'testing' | 'selected' | 'manual'
+  route: string | null
+}
+
+export const getDiscordProbeStatus = () =>
+  invoke<DiscordProbeStatus>('get_discord_probe_status')
+
+export const followManualDiscordRoute = () =>
+  invoke<void>('follow_manual_discord_route')
+
+export const setDiscordProbeContext = (context: {
+  mainGroup: string
+  baseline: string
+  candidates: string[]
+}) => invoke<void>('set_discord_probe_context', { context })

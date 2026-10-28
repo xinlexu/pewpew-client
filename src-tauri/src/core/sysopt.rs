@@ -70,6 +70,19 @@ fn disconnected_proxy_state(
     Some((sys, auto))
 }
 
+/// Turns off whichever of `managed` the system is still using. Returns whether
+/// anything changed.
+fn release_owned_proxy(
+    managed: (Sysproxy, Autoproxy),
+    read_current: impl FnOnce() -> Result<(Sysproxy, Autoproxy)>,
+    apply: impl FnOnce((Sysproxy, Autoproxy)) -> Result<()>,
+) -> Result<bool> {
+    match disconnected_proxy_state(read_current()?, &[managed]) {
+        Some(next) => apply(next).map(|()| true),
+        None => Ok(false),
+    }
+}
+
 fn apply_proxy_pair((sys, auto): (Sysproxy, Autoproxy)) -> Result<()> {
     for step in proxy_apply_steps(sys.enable, auto.enable) {
         match step {
@@ -276,6 +289,25 @@ impl Sysopt {
         Ok(())
     }
 
+    /// Turns this client's system proxy and PAC off right away, on the calling
+    /// thread. Windows ends a session (shutdown, restart, sign-out) without
+    /// asking the app to quit and terminates it moments later, so the async
+    /// reset in the quit path never runs. A proxy left on would leave the next
+    /// boot without internet until PewPew starts. The saved preference is kept,
+    /// so PewPew reconnects when it starts again. Returns whether anything
+    /// changed.
+    pub fn release_proxy_now(&self) -> Result<bool> {
+        let guard = self.access_guard();
+        guard.read().stop();
+        guard.write().set_guard_type(GuardType::None);
+        let managed = self.inner_proxy.read().clone();
+        release_owned_proxy(
+            managed,
+            || Ok((Sysproxy::get_system_proxy()?, Autoproxy::get_auto_proxy()?)),
+            apply_proxy_pair,
+        )
+    }
+
     /// reset the sysproxy
     pub async fn reset_sysproxy(&self) -> Result<()> {
         if self
@@ -316,7 +348,8 @@ impl Sysopt {
 
 #[cfg(test)]
 mod tests {
-    use super::{ProxyApplyStep, disconnected_proxy_state, proxy_apply_steps};
+    use super::{ProxyApplyStep, disconnected_proxy_state, proxy_apply_steps, release_owned_proxy};
+    use std::cell::RefCell;
     use sysproxy::{Autoproxy, Sysproxy};
 
     fn proxy_pair(host: &str, url: &str) -> (Sysproxy, Autoproxy) {
@@ -369,6 +402,56 @@ mod tests {
     fn uninitialized_proxy_is_not_owned() {
         let current = proxy_pair("office.example", "");
         assert!(disconnected_proxy_state(current, &[(Sysproxy::default(), Autoproxy::default())]).is_none());
+    }
+
+    #[test]
+    fn session_end_turns_off_our_proxy_and_keeps_its_address() -> anyhow::Result<()> {
+        let ours = proxy_pair("127.0.0.1", "http://127.0.0.1:33331/commands/pac");
+        let current = (ours.0.clone(), Autoproxy::default());
+        let applied = RefCell::new(None);
+        let changed = release_owned_proxy(
+            ours,
+            || Ok(current),
+            |next| {
+                applied.replace(Some(next));
+                Ok(())
+            },
+        )?;
+        assert!(changed);
+        let (sys, auto) = applied
+            .into_inner()
+            .ok_or_else(|| anyhow::anyhow!("nothing was applied"))?;
+        assert!(!sys.enable);
+        assert_eq!((sys.host.as_str(), sys.port), ("127.0.0.1", 7897));
+        assert!(!auto.enable);
+        Ok(())
+    }
+
+    #[test]
+    fn session_end_leaves_other_apps_proxies_alone() -> anyhow::Result<()> {
+        let ours = proxy_pair("127.0.0.1", "http://127.0.0.1:33331/commands/pac");
+        let foreign = proxy_pair("office.example", "https://office.example/proxy.pac");
+        let changed = release_owned_proxy(
+            ours,
+            || Ok(foreign),
+            |_| Err(anyhow::anyhow!("a foreign proxy must not be touched")),
+        )?;
+        assert!(!changed);
+        Ok(())
+    }
+
+    #[test]
+    fn session_end_reports_an_unreadable_proxy() {
+        let ours = proxy_pair("127.0.0.1", "http://127.0.0.1:33331/commands/pac");
+        let result = release_owned_proxy(
+            ours,
+            || Err(anyhow::anyhow!("registry unavailable")),
+            |_| Err(anyhow::anyhow!("nothing should be applied")),
+        );
+        assert_eq!(
+            result.map_err(|e| e.to_string()),
+            Err("registry unavailable".to_owned())
+        );
     }
 
     #[test]

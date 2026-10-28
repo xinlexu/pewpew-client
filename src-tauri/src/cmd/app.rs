@@ -70,6 +70,21 @@ pub async fn exit_app() {
     feat::quit().await;
 }
 
+/// 安装更新前：像正常退出一样恢复系统代理、关闭增强模式并停止连接核心，
+/// 然后由更新程序退出客户端并运行安装包。清理最多等 10 秒；卡住时先关掉
+/// 系统代理再返回错误；前端必须取消安装并恢复客户端。
+#[tauri::command]
+pub async fn prepare_update_install() -> CmdResult<()> {
+    match tokio::time::timeout(std::time::Duration::from_secs(10), feat::prepare_for_update()).await {
+        Ok(true) => Ok(()),
+        Ok(false) => Err("pewpew-update-cleanup-incomplete".into()),
+        Err(_) => {
+            let _ = crate::core::sysopt::Sysopt::global().release_proxy_now();
+            Err("pewpew-update-cleanup-timeout".into())
+        }
+    }
+}
+
 /// 重启应用
 #[tauri::command]
 pub async fn restart_app() -> CmdResult<()> {

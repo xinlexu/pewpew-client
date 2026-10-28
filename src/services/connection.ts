@@ -17,6 +17,7 @@ import {
   connectionPatch,
   createConnectionQueue,
 } from '@/utils/connection-state'
+import { PEWPEW_DEFAULT_MIXED_PORT } from '@/utils/pewpew-ports'
 
 const enqueue = createConnectionQueue()
 
@@ -34,7 +35,8 @@ export async function readConnectionState() {
     invoke<{ enable: boolean; url: string }>('get_auto_proxy'),
   ])
   const host = settings.proxy_host || '127.0.0.1'
-  const port = settings.verge_mixed_port || config?.mixedPort || 7897
+  const port =
+    settings.verge_mixed_port || config?.mixedPort || PEWPEW_DEFAULT_MIXED_PORT
   const pacPort = import.meta.env.DEV ? 11233 : 33331
   const coreStopped = !config && (await getRunningMode()) === 'NotRunning'
   return {

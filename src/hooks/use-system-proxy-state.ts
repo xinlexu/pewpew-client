@@ -6,6 +6,7 @@ import { useVerge } from '@/hooks/use-verge'
 import { useClashConfigData, useSystemData } from '@/providers/app-data-context'
 import { getAutotemProxy } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
+import { PEWPEW_DEFAULT_MIXED_PORT } from '@/utils/pewpew-ports'
 
 // 系统代理状态检测统一逻辑
 export const useSystemProxyState = () => {
@@ -24,7 +25,8 @@ export const useSystemProxyState = () => {
   // OS 实际状态：enable + 地址匹配本应用
   const indicator = (() => {
     const host = proxy_host || '127.0.0.1'
-    const port = verge_mixed_port || clashConfig?.mixedPort || 7897
+    const port =
+      verge_mixed_port || clashConfig?.mixedPort || PEWPEW_DEFAULT_MIXED_PORT
     const pacPort = import.meta.env.DEV ? 11233 : 33331
     return Boolean(
       (sysproxy?.enable && sysproxy.server === `${host}:${port}`) ||

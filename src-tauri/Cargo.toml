@@ -1,6 +1,6 @@
 [package]
 name = "pewpew-client"
-version = "0.1.4"
+version = "0.1.5"
 description = "PewPew 云客户端"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
@@ -87,6 +87,8 @@ aes-gcm = { version = "0.10.3", features = ["std"] }
 base64 = "0.22.1"
 getrandom = "0.4.2"
 futures = "0.3.32"
+fast-socks5 = "1.0.0"
+sysinfo = "0.39.2"
 gethostname = "1.1.0"
 scopeguard = "1.2.0"
 tauri-plugin-notification = "2.3.3"
@@ -141,6 +143,7 @@ windows = { version = "0.62.2", features = [
   "Win32_Foundation",
   "Win32_Globalization",
   "Win32_System_Com",
+  "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Registry",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",

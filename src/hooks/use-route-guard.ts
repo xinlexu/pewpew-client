@@ -20,6 +20,7 @@ export const useRouteGuard = () => {
   const { t } = useTranslation()
   const { refreshProxy } = useAppRefreshers()
   const { selectRoute } = useProxySelection({
+    manual: false,
     onError: (error) => {
       console.error('[PewPew] 自动选择线路失败:', error)
     },

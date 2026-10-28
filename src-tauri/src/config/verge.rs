@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::{
     config::{DEFAULT_PAC, deserialize_encrypted, serialize_encrypted},
+    constants::network::ports,
     utils::{dirs, help},
 };
 use anyhow::Result;
@@ -298,7 +299,7 @@ impl IVerge {
             Err(_) => Self::template(),
         };
 
-        let mut needs_fix = false;
+        let mut needs_fix = config.migrate_legacy_ports();
 
         if let Some(ref core) = config.clash_core {
             let core_str = core.trim();
@@ -358,6 +359,31 @@ impl IVerge {
         self.clash_core.clone().unwrap_or_else(|| "verge-mihomo".into())
     }
 
+    /// Earlier versions shared Clash Verge's default ports (7897-7899), so both
+    /// apps fought over them. Moves those defaults to PewPew's own ports.
+    /// Returns true when anything changed.
+    pub fn migrate_legacy_ports(&mut self) -> bool {
+        let mut changed = false;
+        for (port, legacy, default) in [
+            (&mut self.verge_mixed_port, ports::LEGACY_MIXED, ports::DEFAULT_MIXED),
+            (&mut self.verge_socks_port, ports::LEGACY_SOCKS, ports::DEFAULT_SOCKS),
+            (&mut self.verge_port, ports::LEGACY_HTTP, ports::DEFAULT_HTTP),
+        ] {
+            if *port == Some(legacy) {
+                *port = Some(default);
+                changed = true;
+            }
+        }
+        if changed {
+            logging!(
+                info,
+                Type::Config,
+                "已将与 Clash Verge 相同的默认端口迁移到 PewPew 专用端口"
+            );
+        }
+        changed
+    }
+
     pub async fn new() -> Self {
         match dirs::verge_path() {
             Ok(path) => match help::read_yaml::<Self>(&path).await {
@@ -368,6 +394,7 @@ impl IVerge {
                     {
                         config.start_page = Some(String::from("/"));
                     }
+                    config.migrate_legacy_ports();
                     config
                 }
                 Err(err) => {
@@ -422,10 +449,10 @@ impl IVerge {
             verge_tproxy_port: Some(7896),
             #[cfg(target_os = "linux")]
             verge_tproxy_enabled: Some(false),
-            verge_mixed_port: Some(7897),
-            verge_socks_port: Some(7898),
+            verge_mixed_port: Some(ports::DEFAULT_MIXED),
+            verge_socks_port: Some(ports::DEFAULT_SOCKS),
             verge_socks_enabled: Some(false),
-            verge_port: Some(7899),
+            verge_port: Some(ports::DEFAULT_HTTP),
             verge_http_enabled: Some(false),
             enable_proxy_guard: Some(false),
             enable_bypass_check: Some(true),
@@ -580,5 +607,48 @@ impl IVerge {
         } else {
             LevelFilter::Info
         }
+    }
+}
+
+#[cfg(test)]
+mod port_migration_tests {
+    use super::IVerge;
+    use crate::constants::network::ports;
+
+    #[test]
+    fn clash_verge_default_ports_move_to_pewpew_ports() {
+        let mut config = IVerge {
+            verge_mixed_port: Some(ports::LEGACY_MIXED),
+            verge_socks_port: Some(ports::LEGACY_SOCKS),
+            verge_port: Some(ports::LEGACY_HTTP),
+            ..IVerge::default()
+        };
+        assert!(config.migrate_legacy_ports());
+        assert_eq!(config.verge_mixed_port, Some(ports::DEFAULT_MIXED));
+        assert_eq!(config.verge_socks_port, Some(ports::DEFAULT_SOCKS));
+        assert_eq!(config.verge_port, Some(ports::DEFAULT_HTTP));
+        assert!(!config.migrate_legacy_ports());
+    }
+
+    #[test]
+    fn chosen_or_missing_ports_stay_unchanged() {
+        let mut config = IVerge {
+            verge_mixed_port: Some(7890),
+            verge_socks_port: None,
+            verge_port: Some(8080),
+            ..IVerge::default()
+        };
+        assert!(!config.migrate_legacy_ports());
+        assert_eq!(config.verge_mixed_port, Some(7890));
+        assert_eq!(config.verge_socks_port, None);
+        assert_eq!(config.verge_port, Some(8080));
+    }
+
+    #[test]
+    fn new_installs_use_pewpew_ports() {
+        let config = IVerge::template();
+        assert_eq!(config.verge_mixed_port, Some(ports::DEFAULT_MIXED));
+        assert_eq!(config.verge_socks_port, Some(ports::DEFAULT_SOCKS));
+        assert_eq!(config.verge_port, Some(ports::DEFAULT_HTTP));
     }
 }

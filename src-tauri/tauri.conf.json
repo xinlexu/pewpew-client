@@ -1,5 +1,5 @@
 {
-  "version": "0.1.4",
+  "version": "0.1.5",
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "active": true,
@@ -31,8 +31,10 @@
   "identifier": "com.pewpewcloud.client",
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyOEMyRjBCQkVGOUJEREYKUldUZnZmbStDeStNMHU5Mmo1N24xQXZwSVRYbXA2NUpzZE5oVzlqeS9Bc0t6RVV4MmtwVjBZaHgK",
-      "endpoints": [],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM0M0MyQTUwM0Q1RkMwQkIKUldTN3dGODlVQ284TkcvVk15NEFaT3NaY1BEYnJjblk5K1NOUldmYTZYVnpBUjJESnRxRVpvczYK",
+      "endpoints": [
+        "https://github.com/xinlexu/pewpew-client/releases/download/updater/latest.json"
+      ],
       "windows": {
         "installMode": "passive"
       }

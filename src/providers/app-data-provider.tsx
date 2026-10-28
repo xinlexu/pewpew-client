@@ -14,7 +14,10 @@ import {
   getAppUptime,
   getRunningMode,
   getSystemProxy,
+  setDiscordProbeContext,
 } from '@/services/cmds'
+import { resolvePewPewProxyGroup } from '@/utils/pewpew-client'
+import { PEWPEW_DEFAULT_MIXED_PORT } from '@/utils/pewpew-ports'
 
 import {
   ClashConfigContext,
@@ -80,6 +83,30 @@ export const AppDataProvider = ({
     queryFn: calcuProxyProviders,
     ...TQ_MIHOMO,
   })
+
+  const discordContext = useMemo(() => {
+    const selected = resolvePewPewProxyGroup(proxiesData, clashConfig?.mode)
+    return JSON.stringify({
+      mainGroup: selected.group?.name ?? '',
+      baseline: selected.currentName,
+      candidates: selected.options
+        .filter((option) => option.record.udp)
+        .slice()
+        .sort((a, b) => {
+          const delay = (record: IProxyItem) =>
+            record.history?.at(-1)?.delay || Number.MAX_SAFE_INTEGER
+          return (
+            delay(a.record) - delay(b.record) || a.name.localeCompare(b.name)
+          )
+        })
+        .slice(0, 3)
+        .map((option) => option.name),
+    })
+  }, [proxiesData, clashConfig?.mode])
+
+  useEffect(() => {
+    void setDiscordProbeContext(JSON.parse(discordContext)).catch(() => {})
+  }, [discordContext])
 
   const { data: ruleProviders, refetch: _refetchRuleProviders } = useQuery({
     queryKey: ['getRuleProviders'],
@@ -236,7 +263,9 @@ export const AppDataProvider = ({
         // PAC模式：显示我们期望设置的代理地址
         const proxyHost = verge.proxy_host || '127.0.0.1'
         const proxyPort =
-          verge.verge_mixed_port || clashConfig.mixedPort || 7897
+          verge.verge_mixed_port ||
+          clashConfig.mixedPort ||
+          PEWPEW_DEFAULT_MIXED_PORT
         return `${proxyHost}:${proxyPort}`
       } else {
         // HTTP代理模式：优先使用系统地址，但如果格式不正确则使用期望地址
@@ -251,7 +280,9 @@ export const AppDataProvider = ({
           // 系统地址无效，返回期望的代理地址
           const proxyHost = verge.proxy_host || '127.0.0.1'
           const proxyPort =
-            verge.verge_mixed_port || clashConfig.mixedPort || 7897
+            verge.verge_mixed_port ||
+            clashConfig.mixedPort ||
+            PEWPEW_DEFAULT_MIXED_PORT
           return `${proxyHost}:${proxyPort}`
         }
       }

@@ -111,7 +111,14 @@ try {
   assert.equal((await state()).config.tun.enable, true)
   assert.equal((await state()).system.enable, true)
   await button('Check Connection').click()
-  await page.getByText('Not tested', { exact: true }).waitFor()
+  await page.getByText('None found', { exact: true }).waitFor()
+  assert.equal(await page.getByText('Voice connectivity').count(), 0)
+  await page.getByText('Discord route', { exact: true }).waitFor()
+  await page
+    .getByText('Following current rules; no better route confirmed', {
+      exact: true,
+    })
+    .waitFor()
   await noOverflow()
   await capture('desktop-diagnostics.png')
   await button('Close').click()
@@ -176,7 +183,7 @@ try {
     await noOverflow()
     await capture(`warning-${width}.png`)
     await button('Check Connection').click()
-    await page.getByText('Not tested', { exact: true }).waitFor()
+    await page.getByText('None found', { exact: true }).waitFor()
     await noOverflow()
     await capture(`diagnostics-${width}.png`)
   }

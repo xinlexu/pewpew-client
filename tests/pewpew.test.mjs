@@ -17,6 +17,45 @@ const model = (...items) => ({
   records: Object.fromEntries(items.map((item) => [item.name, item])),
 })
 
+test('internal Discord selectors never replace the user route picker', () => {
+  const data = model(
+    {
+      ...selector('PewPew Internal Discord test', ['Paris'], 'Paris'),
+      hidden: true,
+    },
+    selector('PewPew Internal Probe test', ['Paris'], 'Paris'),
+    selector('My routes', ['Tokyo'], 'Tokyo'),
+    route('Paris'),
+    route('Tokyo'),
+  )
+  assert.equal(resolvePewPewProxyGroup(data).group.name, 'My routes')
+  assert.equal(resolvePewPewProxyGroup(data).currentName, 'Tokyo')
+})
+
+test('global selection never traverses internal groups or selects PASS', () => {
+  const data = model(
+    selector(
+      'GLOBAL',
+      ['PewPew Internal Discord test', 'My routes', 'PASS'],
+      'My routes',
+    ),
+    {
+      ...selector('PewPew Internal Discord test', ['Paris'], 'Paris'),
+      hidden: true,
+    },
+    selector('My routes', ['Tokyo'], 'Tokyo'),
+    route('Paris'),
+    route('Tokyo'),
+    { name: 'PASS', type: 'Pass' },
+  )
+  const result = resolvePewPewProxyGroup(data, 'global')
+  assert.deepEqual(
+    result.options.map((item) => item.name),
+    ['Tokyo'],
+  )
+  assert.equal(result.options[0].selectionPath[0].proxyName, 'My routes')
+})
+
 test('nested routes retain the full selection path and current leaf', () => {
   const data = model(
     selector('Proxy', ['Region'], 'Region'),

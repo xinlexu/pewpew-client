@@ -69,6 +69,7 @@ const POLICY_TYPES = new Set([
 const BLOCKED_EXACT_NAMES = new Set([
   'DIRECT',
   'REJECT',
+  'PASS',
   'GLOBAL',
   'AUTO',
   'URLTEST',
@@ -247,6 +248,7 @@ export const isRealRoute = (
 ) => {
   const value = (name || '').trim()
   if (!value) return false
+  if (value.startsWith('PewPew Internal ')) return false
   if (isInformationalNode(value)) return false
   if (record?.hidden) return false
   if (Array.isArray(record?.all) && record.all.length > 0) return false
@@ -287,7 +289,12 @@ const groupOptions = (
     path: PewPewRouteSelection[],
     seenGroups: Set<string>,
   ) => {
-    if (normalizeType(parent.type) !== 'selector') return
+    if (
+      normalizeType(parent.type) !== 'selector' ||
+      parent.hidden ||
+      parent.name.startsWith('PewPew Internal ')
+    )
+      return
     for (const item of parent.all || []) {
       const name = getProxyName(item)
       if (!name) continue
@@ -398,7 +405,10 @@ export const resolvePewPewProxyGroup = (
     collectGroups(proxies).map((group) => [group.name, group] as const),
   )
   const selectableGroups = collectGroups(proxies).filter(
-    (group) => normalizeType(group.type) === 'selector',
+    (group) =>
+      normalizeType(group.type) === 'selector' &&
+      !group.hidden &&
+      !group.name.startsWith('PewPew Internal '),
   )
   const candidates =
     mode.toLowerCase() === 'global'

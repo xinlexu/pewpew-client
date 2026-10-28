@@ -5,6 +5,7 @@ import {
   HelpOutlineRounded,
   RemoveCircleOutlineRounded,
   ShieldOutlined,
+  SpeedRounded,
   TroubleshootRounded,
   WarningAmberRounded,
 } from '@mui/icons-material'
@@ -48,9 +49,18 @@ import {
   useClashConfigData,
   useProxiesData,
 } from '@/providers/app-data-context'
-import { isServiceAvailable } from '@/services/cmds'
+import {
+  detectProxyConflicts,
+  getDiscordProbeStatus,
+  isServiceAvailable,
+  type DiscordProbeStatus,
+} from '@/services/cmds'
 import { readConnectionState } from '@/services/connection'
 import { showNotice } from '@/services/notice-service'
+import {
+  configuredMixedPort,
+  isProxyPortOpen,
+} from '@/services/proxy-conflicts'
 import type { ConnectionMode } from '@/utils/connection-state'
 import { resolvePewPewProxyGroup } from '@/utils/pewpew-client'
 
@@ -70,8 +80,11 @@ interface ProxyTunCardProps {
   statusTone?: 'default' | 'warning' | 'error'
   // Shown on the main button while it is disabled for loading or updating.
   pendingLabel?: string
-  // Runs before connecting; return false to cancel (it reports its own notice).
-  beforeConnect?: () => Promise<boolean>
+  // Runs before connecting; false stops with a failure (it reports its own
+  // notice), 'cancelled' stops quietly because the user chose to.
+  beforeConnect?: () => Promise<boolean | 'cancelled'>
+  // Opens the speed test; the button shows only while connected.
+  onSpeedTest?: () => void
   footer?: ReactNode
 }
 
@@ -127,6 +140,19 @@ const statusPulse = keyframes`
   100% { transform: scale(1); opacity: 1; }
 `
 
+// The status line fades in whenever its text changes. Opacity only, so the
+// line never moves or overflows while it animates.
+const statusSwap = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`
+
+// Diagnostic rows appear one after another.
+const rowIn = keyframes`
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+`
+
 export const ProxyTunCard: FC<ProxyTunCardProps> = ({
   disabled = false,
   hasRoute = true,
@@ -141,6 +167,7 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
   statusTone = 'default',
   pendingLabel,
   beforeConnect,
+  onSpeedTest,
   footer,
 }) => {
   const theme = useTheme()
@@ -171,6 +198,12 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
     tun: boolean
     service: boolean
     core: boolean
+    // Local proxy port, and whether the core could open it.
+    port: number
+    portOpen: boolean
+    // Other running proxy apps; null when they could not be listed.
+    otherApps: string[] | null
+    discord: DiscordProbeStatus | null
   } | null>(null)
   const [diagnosticsFailed, setDiagnosticsFailed] = useState(false)
 
@@ -276,7 +309,12 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
     setFailure(null)
     setPhase(next ? 'connecting' : 'disconnecting')
     try {
-      if (next && beforeConnect && !(await beforeConnect())) {
+      const ready = next && beforeConnect ? await beforeConnect() : true
+      if (ready === 'cancelled') {
+        setPhase('idle')
+        return
+      }
+      if (!ready) {
         reportError('pewpew-route-unavailable', 'connect', false)
         return
       }
@@ -334,15 +372,21 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
     setDiagnosticsFailed(false)
     setDiagnostics(null)
     try {
-      const [state, service] = await Promise.all([
+      const [state, service, conflicts, discord] = await Promise.all([
         readConnectionState(),
         isServiceAvailable().catch(() => false),
+        detectProxyConflicts().catch(() => null),
+        getDiscordProbeStatus().catch(() => null),
       ])
       setDiagnostics({
         systemProxy: state.systemProxy,
         tun: state.tun,
         service,
         core: !!state.config,
+        port: configuredMixedPort(state.settings, state.config),
+        portOpen: isProxyPortOpen(state.config),
+        otherApps: conflicts?.apps ?? null,
+        discord,
       })
     } catch {
       setDiagnosticsFailed(true)
@@ -404,6 +448,7 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
     label: string,
     value: string,
     state: 'ok' | 'off' | 'warn' | 'unknown',
+    index = 0,
   ) => (
     <Stack
       key={label}
@@ -415,6 +460,9 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
         py: 0.9,
         borderBottom: `1px solid ${theme.palette.divider}`,
         '&:last-of-type': { borderBottom: 0 },
+        animation: `${rowIn} 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both`,
+        animationDelay: `${index * 45}ms`,
+        [reducedMotion]: { animation: 'none' },
       }}
     >
       <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -477,7 +525,17 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
               [reducedMotion]: { transition: 'none' },
             }}
           >
-            {t(statusKey)}
+            {/* Keyed so the new text eases in; the live region stays put. */}
+            <Box
+              component="span"
+              key={statusKey}
+              sx={{
+                animation: `${statusSwap} 260ms ease both`,
+                [reducedMotion]: { animation: 'none' },
+              }}
+            >
+              {t(statusKey)}
+            </Box>
           </Typography>
         </Stack>
         {statusDetail && (
@@ -601,15 +659,31 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
         </Alert>
       )}
 
-      <Button
-        size="small"
-        startIcon={<TroubleshootRounded />}
-        disabled={busy || diagnosticsLoading}
-        onClick={() => void inspectConnection()}
-        sx={pillButtonSx}
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ justifyContent: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
       >
-        {t('home.pewpew.compatibility.check')}
-      </Button>
+        <Button
+          size="small"
+          startIcon={<TroubleshootRounded />}
+          disabled={busy || diagnosticsLoading}
+          onClick={() => void inspectConnection()}
+          sx={pillButtonSx}
+        >
+          {t('home.pewpew.compatibility.check')}
+        </Button>
+        {onSpeedTest && isConnectedLook && (
+          <Button
+            size="small"
+            startIcon={<SpeedRounded />}
+            onClick={onSpeedTest}
+            sx={pillButtonSx}
+          >
+            {t('home.pewpew.speedTest.button')}
+          </Button>
+        )}
+      </Stack>
 
       <Dialog
         open={consentAction !== null}
@@ -703,13 +777,14 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
                     ['enhanced', diagnostics.tun],
                     ['service', diagnostics.service],
                   ] as const
-                ).map(([label, active]) =>
+                ).map(([label, active], index) =>
                   renderDiagnosticRow(
                     t(`home.pewpew.compatibility.${label}`),
                     t(
                       `home.pewpew.compatibility.${active ? 'active' : 'inactive'}`,
                     ),
                     active ? 'ok' : 'off',
+                    index,
                   ),
                 )}
                 {renderDiagnosticRow(
@@ -718,13 +793,56 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
                     `home.pewpew.compatibility.${udp === true ? 'supported' : udp === false ? 'unsupported' : 'unknown'}`,
                   ),
                   udp === true ? 'ok' : udp === false ? 'warn' : 'unknown',
+                  4,
                 )}
+                {diagnostics.core &&
+                  renderDiagnosticRow(
+                    t('home.pewpew.compatibility.port'),
+                    t(
+                      diagnostics.portOpen
+                        ? 'home.pewpew.compatibility.portListening'
+                        : 'home.pewpew.compatibility.portBusy',
+                      { port: diagnostics.port },
+                    ),
+                    diagnostics.portOpen ? 'ok' : 'warn',
+                    5,
+                  )}
                 {renderDiagnosticRow(
-                  t('home.pewpew.compatibility.voice'),
-                  t('home.pewpew.compatibility.notTested'),
-                  'unknown',
+                  t('home.pewpew.compatibility.otherApps'),
+                  diagnostics.otherApps === null
+                    ? t('home.pewpew.compatibility.unknown')
+                    : diagnostics.otherApps.length
+                      ? diagnostics.otherApps.join(', ')
+                      : t('home.pewpew.compatibility.noOtherApps'),
+                  diagnostics.otherApps === null
+                    ? 'unknown'
+                    : diagnostics.otherApps.length
+                      ? 'warn'
+                      : 'ok',
+                  6,
                 )}
+                {diagnostics.tun &&
+                  renderDiagnosticRow(
+                    t('home.pewpew.discord.label'),
+                    t(
+                      `home.pewpew.discord.${diagnostics.discord?.state ?? 'following'}`,
+                      {
+                        route: diagnostics.discord?.route ?? '',
+                      },
+                    ),
+                    diagnostics.discord?.state === 'selected'
+                      ? 'ok'
+                      : 'unknown',
+                    7,
+                  )}
               </Box>
+              {!!diagnostics.otherApps?.length && (
+                <Alert severity="warning" sx={{ borderRadius: '12px' }}>
+                  {t('home.pewpew.conflict.apps', {
+                    apps: diagnostics.otherApps.join(', '),
+                  })}
+                </Alert>
+              )}
               {udp === false && (
                 <Alert severity="warning" sx={{ borderRadius: '12px' }}>
                   {t('home.pewpew.compatibility.udpUnsupported')}

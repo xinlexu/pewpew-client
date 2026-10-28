@@ -8,7 +8,10 @@ import {
 
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
-import { syncTrayProxySelection } from '@/services/cmds'
+import {
+  followManualDiscordRoute,
+  syncTrayProxySelection,
+} from '@/services/cmds'
 import { debugLog } from '@/utils/debug'
 import type { PewPewRouteSelection } from '@/utils/pewpew-client'
 import { applyRouteSelection } from '@/utils/route-selection'
@@ -34,6 +37,7 @@ interface ProxySelectionOptions {
   onSuccess?: () => void
   onError?: (error: any) => void
   enableConnectionCleanup?: boolean
+  manual?: boolean
 }
 
 interface ProxyChangeRequest {
@@ -51,7 +55,12 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
   const pendingRequestRef = useRef<ProxyChangeRequest | null>(null)
   const isProcessingRef = useRef(false)
 
-  const { onSuccess, onError, enableConnectionCleanup = true } = options
+  const {
+    onSuccess,
+    onError,
+    enableConnectionCleanup = true,
+    manual = true,
+  } = options
 
   // 缓存
   const config = useMemo(
@@ -97,6 +106,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
       debugLog(`[ProxySelection] 代理切换: ${groupName} -> ${proxyName}`)
 
       try {
+        if (manual) await followManualDiscordRoute()
         await applyRouteSelection(path, selectNodeForGroup)
         onSuccess?.()
         syncTraySelection()
@@ -120,6 +130,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
         )
 
         try {
+          if (manual) await followManualDiscordRoute()
           await applyRouteSelection(path, selectNodeForGroup)
           onSuccess?.()
           syncTraySelection()
@@ -138,7 +149,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
         }
       }
     },
-    [config, onError, onSuccess, persistSelection, syncTraySelection],
+    [config, manual, onError, onSuccess, persistSelection, syncTraySelection],
   )
 
   const { mutateAsync: selectQueued } = useMutation({

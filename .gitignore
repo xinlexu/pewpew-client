@@ -39,6 +39,7 @@ AGENTS.md
 *.provisioningprofile
 *.cer
 *.crt
+!services/route-probe/server.crt
 *.csr
 README 2.md
 * 2.tsx

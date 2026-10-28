@@ -5,6 +5,7 @@ mod cmd;
 pub mod config;
 mod constants;
 mod core;
+mod discord_probe;
 mod enhance;
 mod feat;
 mod module;
@@ -135,6 +136,13 @@ mod app_init {
             tauri_plugin_clash_verge_sysinfo::commands::app_is_admin,
             tauri_plugin_clash_verge_sysinfo::commands::export_diagnostic_info,
             cmd::is_port_in_use,
+            cmd::detect_proxy_conflicts,
+            cmd::find_free_proxy_port,
+            cmd::run_speed_test,
+            cmd::cancel_speed_test,
+            discord_probe::set_discord_probe_context,
+            discord_probe::get_discord_probe_status,
+            discord_probe::follow_manual_discord_route,
             cmd::get_sys_proxy,
             cmd::get_auto_proxy,
             cmd::open_app_dir,
@@ -147,6 +155,7 @@ mod app_init {
             cmd::get_network_interfaces,
             cmd::get_system_hostname,
             cmd::restart_app,
+            cmd::prepare_update_install,
             cmd::start_core,
             cmd::stop_core,
             cmd::restart_core,
@@ -255,6 +264,7 @@ pub fn run() {
             resolve::resolve_setup_async();
             resolve::resolve_setup_sync();
             resolve::init_signal();
+            discord_probe::start();
 
             logging!(info, Type::Setup, "初始化已启动");
             Ok(())
@@ -399,6 +409,18 @@ pub fn run() {
             });
         }
         tauri::RunEvent::Exit => {
+            // Windows ends a session (shutdown, restart, sign-out) by tearing
+            // down the event loop, which arrives here, and ends the process
+            // right after; the quit path never runs. Turn the system proxy off
+            // now, or the next boot has no internet until PewPew starts.
+            if cfg!(target_os = "windows") {
+                core::handle::Handle::global().set_is_exiting();
+                match core::sysopt::Sysopt::global().release_proxy_now() {
+                    Ok(true) => logging!(info, Type::System, "系统会话结束，已关闭系统代理"),
+                    Ok(false) => {}
+                    Err(e) => logging!(warn, Type::System, "系统会话结束时关闭系统代理失败: {e}"),
+                }
+            }
             logging!(info, Type::System, "Application exited");
         }
         #[allow(unused_variables)]

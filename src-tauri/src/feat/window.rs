@@ -4,7 +4,12 @@ use crate::module::lightweight;
 use crate::utils;
 use crate::utils::window_manager::WindowManager;
 use clash_verge_logging::{Type, logging};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::time::{Duration, timeout};
+
+/// A normal quit takes about 4 seconds at most, even when the core does not
+/// answer; past this the process ends anyway.
+const QUIT_DEADLINE: Duration = Duration::from_secs(8);
 
 pub async fn open_or_close_dashboard() {
     if lightweight::is_in_lightweight_mode() {
@@ -17,7 +22,8 @@ pub async fn open_or_close_dashboard() {
 }
 
 pub async fn quit() {
-    logging!(debug, Type::System, "启动退出流程");
+    logging!(info, Type::System, "启动退出流程");
+    start_quit_watchdog();
     // 设置退出标志
     handle::Handle::global().set_is_exiting();
 
@@ -36,6 +42,55 @@ pub async fn quit() {
 
     let app_handle = handle::Handle::app_handle();
     app_handle.exit(if cleanup_result { 0 } else { 1 });
+}
+
+/// Ends the process if quitting stalls, so 退出 always works and never leaves
+/// the system proxy pointing at a client that is gone. Runs on its own thread
+/// in case the async runtime is what is stuck.
+fn start_quit_watchdog() {
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let spawned = std::thread::Builder::new()
+        .name("pewpew-quit-watchdog".into())
+        .spawn(|| {
+            std::thread::sleep(QUIT_DEADLINE);
+            force_quit();
+        });
+    if let Err(e) = spawned {
+        logging!(warn, Type::System, "无法启动退出超时保护: {e}");
+    }
+}
+
+fn force_quit() -> ! {
+    logging!(
+        warn,
+        Type::System,
+        "退出超过 {} 秒仍未完成，强制退出",
+        QUIT_DEADLINE.as_secs()
+    );
+    if let Err(e) = sysopt::Sysopt::global().release_proxy_now() {
+        logging!(warn, Type::System, "强制退出前关闭系统代理失败: {e}");
+    }
+    if let Some(child) = CoreManager::global().take_child_sidecar() {
+        let _ = child.kill();
+    }
+    std::process::exit(1)
+}
+
+/// Leaves the network the way a normal quit does (system proxy restored, TUN
+/// off, core stopped) without exiting, so the updater can run the installer.
+pub async fn prepare_for_update() -> bool {
+    logging!(info, Type::System, "准备安装更新，先恢复网络并停止连接核心");
+    handle::Handle::global().set_is_exiting();
+
+    utils::server::shutdown_embedded_server();
+    Config::apply_all_and_save_file().await;
+
+    let cleanup_result = clean_async().await;
+    logging!(info, Type::System, "更新前清理完成: {}", cleanup_result);
+    cleanup_result
 }
 
 pub async fn clean_async() -> bool {

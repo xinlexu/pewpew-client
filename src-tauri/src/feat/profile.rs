@@ -18,6 +18,10 @@ pub async fn toggle_proxy_profile(profile_index: String) {
 }
 
 pub async fn switch_proxy_node(group_name: &str, proxy_name: &str) {
+    if let Err(err) = crate::discord_probe::follow_manual_discord_route().await {
+        logging!(error, Type::Tray, "Could not stop automatic Discord routing: {err}");
+        return;
+    }
     match handle::Handle::mihomo()
         .await
         .select_node_for_group(group_name, proxy_name)
