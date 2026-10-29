@@ -8,6 +8,8 @@ members = [
   "crates/clash-verge-i18n",
   "crates/clash-verge-limiter",
 ]
+# PewPew's background service builds on its own, with its own Cargo.lock.
+exclude = ["crates/pewpew-service"]
 resolver = "2"
 
 [profile.release]

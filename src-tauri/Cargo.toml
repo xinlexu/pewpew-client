@@ -1,6 +1,6 @@
 [package]
 name = "pewpew-client"
-version = "0.1.5"
+version = "0.1.6"
 description = "PewPew 云客户端"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
@@ -100,9 +100,10 @@ tauri-plugin-devtools = { version = "2.1.0" }
 tauri-plugin-mihomo = { git = "https://github.com/clash-verge-rev/tauri-plugin-mihomo" }
 clash_verge_logger = { git = "https://github.com/clash-verge-rev/clash-verge-logger" }
 async-trait = "0.1.89"
+# PewPew's own build of the upstream service, with PewPew's Windows names.
 clash_verge_service_ipc = { version = "=2.3.0", features = [
   "client",
-], git = "https://github.com/clash-verge-rev/clash-verge-service-ipc" }
+], path = "../crates/pewpew-service" }
 arc-swap = "1.9.1"
 tokio-rustls = "0.26.4"
 rustls = { version = "0.23.40", features = ["ring"] }

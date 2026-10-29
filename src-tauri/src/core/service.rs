@@ -32,8 +32,10 @@ pub enum ServiceStatus {
 #[derive(Clone)]
 pub struct ServiceManager(ServiceStatus);
 
+// Up to 0.1.5 this was `clash_verge_service`, the name Clash Verge also uses;
+// the installer removes that registration when it points into PewPew's folder.
 #[cfg(any(target_os = "windows", test))]
-const WINDOWS_SERVICE_NAME: &str = "clash_verge_service";
+const WINDOWS_SERVICE_NAME: &str = "pewpew_service";
 #[cfg(any(target_os = "windows", test))]
 const WINDOWS_SERVICE_DISPLAY_NAME: &str = "PewPew Background Service";
 #[cfg(any(target_os = "windows", test))]
@@ -867,8 +869,8 @@ mod tests {
             command,
             concat!(
                 r#"("C:\Program Files\PewPew 云客户端\resources\clash-verge-service-install.exe""#,
-                r#" && "C:\WINDOWS\system32\sc.exe" config clash_verge_service DisplayName= "PewPew Background Service""#,
-                r#" && "C:\WINDOWS\system32\sc.exe" description clash_verge_service"#,
+                r#" && "C:\WINDOWS\system32\sc.exe" config pewpew_service DisplayName= "PewPew Background Service""#,
+                r#" && "C:\WINDOWS\system32\sc.exe" description pewpew_service"#,
                 r#" "PewPew Background Service helps to launch the connection core")"#,
                 r#" > "C:\Users\A B\AppData\Roaming\com.pewpewcloud.client\logs\service-install.log" 2>&1"#,
             )

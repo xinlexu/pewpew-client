@@ -758,7 +758,8 @@ const tasks = [
     retry: 5,
   },
   { name: 'plugin', func: resolvePlugin, retry: 5, winOnly: true },
-  { name: 'service', func: resolveServiceBundle, retry: 5 },
+  // Windows uses PewPew's own build of the service (scripts/build-pewpew-service.mjs).
+  { name: 'service', func: resolveServiceBundle, retry: 5, unixOnly: true },
   { name: 'mmdb', func: resolveMmdb, retry: 5 },
   { name: 'geosite', func: resolveGeosite, retry: 5 },
   { name: 'geoip', func: resolveGeoIP, retry: 5 },

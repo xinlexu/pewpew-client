@@ -66,6 +66,10 @@ ${StrLoc}
 !define UNINSTALLERSIGNCOMMAND "{{uninstaller_sign_cmd}}"
 !define ESTIMATEDSIZE "{{estimated_size}}"
 !define STARTMENUFOLDER "{{start_menu_folder}}"
+; PewPew's background service. Up to 0.1.5 it was registered under the name
+; Clash Verge also uses; that registration is removed during setup.
+!define PEWPEW_SERVICE "pewpew_service"
+!define PEWPEW_LEGACY_SERVICE "clash_verge_service"
 
 Var PassiveMode
 Var UpdateMode
@@ -749,26 +753,26 @@ FunctionEnd
 !macroend
 
 !macro PewPewServiceAction ACTION
-  ; The service identifier is shared with the upstream helper. Only touch our installation.
+  ; Only touch the service registered from this installation.
   SetRegView 64
   ClearErrors
-  ReadRegStr $R9 HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "ImagePath"
+  ReadRegStr $R9 HKLM "SYSTEM\CurrentControlSet\Services\${PEWPEW_SERVICE}" "ImagePath"
   !insertmacro PewPewPlainPath $R9
   ${If} $R9 == "$INSTDIR\resources\clash-verge-service.exe"
     !if "${ACTION}" == "start"
       ; Restart the service only when it was running idle. A service that still had a
       ; connection core would restore that core (and TUN) right away during setup.
       ${If} $PewPewRestartService == "1"
-        WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "DisplayName" "PewPew Background Service"
-        WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\clash_verge_service" "Description" "PewPew Background Service"
-        SimpleSC::StartService "clash_verge_service" "" 30
+        WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\${PEWPEW_SERVICE}" "DisplayName" "PewPew Background Service"
+        WriteRegStr HKLM "SYSTEM\CurrentControlSet\Services\${PEWPEW_SERVICE}" "Description" "PewPew Background Service"
+        SimpleSC::StartService "${PEWPEW_SERVICE}" "" 30
         Pop $0
         !insertmacro PewPewLog "background service start: result $0"
       ${Else}
         !insertmacro PewPewLog "background service left stopped; the client starts it when needed"
       ${EndIf}
     !else
-      SimpleSC::GetServiceStatus "clash_verge_service"
+      SimpleSC::GetServiceStatus "${PEWPEW_SERVICE}"
       Pop $0
       Pop $1
       !insertmacro PewPewLog "background service state $1 (query result $0)"
@@ -786,7 +790,7 @@ FunctionEnd
           ${EndIf}
         ${EndIf}
       !endif
-      SimpleSC::StopService "clash_verge_service" 1 30
+      SimpleSC::StopService "${PEWPEW_SERVICE}" 1 30
       Pop $0
       !insertmacro PewPewLog "background service stop: result $0"
       !if "${ACTION}" == "stop"
@@ -797,13 +801,40 @@ FunctionEnd
         ${EndIf}
       !endif
       !if "${ACTION}" == "remove"
-        SimpleSC::RemoveService "clash_verge_service"
+        SimpleSC::RemoveService "${PEWPEW_SERVICE}"
         Pop $0
         !insertmacro PewPewLog "background service remove: result $0"
       !endif
     !endif
   ${Else}
     !insertmacro PewPewLog "background service ${ACTION} skipped; registered path '$R9'"
+  ${EndIf}
+!macroend
+
+; Up to 0.1.5 PewPew registered its service as `clash_verge_service`, the name
+; Clash Verge also uses. Stop and remove that registration, but only when it
+; runs the service file of this installation; Clash Verge's own is left alone.
+; A stop that fails marks the file as busy, so setup asks to retry or cancel.
+!macro PewPewRemoveLegacyService
+  SetRegView 64
+  ClearErrors
+  ReadRegStr $R9 HKLM "SYSTEM\CurrentControlSet\Services\${PEWPEW_LEGACY_SERVICE}" "ImagePath"
+  !insertmacro PewPewPlainPath $R9
+  ${If} $R9 == "$INSTDIR\resources\clash-verge-service.exe"
+    SimpleSC::StopService "${PEWPEW_LEGACY_SERVICE}" 1 30
+    Pop $0
+    !insertmacro PewPewLog "previous background service stop: result $0"
+    ${If} $0 != 0
+    ${AndIf} $0 != 1060
+    ${AndIf} $0 != 1062
+      StrCpy $PewPewBlockedFile "$INSTDIR\resources\clash-verge-service.exe ($0)"
+    ${Else}
+      SimpleSC::RemoveService "${PEWPEW_LEGACY_SERVICE}"
+      Pop $0
+      !insertmacro PewPewLog "previous background service remove: result $0"
+    ${EndIf}
+  ${Else}
+    !insertmacro PewPewLog "previous background service not found for this installation; registered path '$R9'"
   ${EndIf}
 !macroend
 
@@ -963,6 +994,9 @@ Function ${PREFIX}PewPewPrepareFiles
     StrCpy $PewPewBlockedFile ""
     !insertmacro PewPewLog "preparing installation files"
     !insertmacro PewPewServiceAction "stop"
+    ${If} $PewPewBlockedFile == ""
+      !insertmacro PewPewRemoveLegacyService
+    ${EndIf}
     ${If} $PewPewBlockedFile == ""
       !insertmacro PewPewOwnCores 1
       !insertmacro PewPewCheckWritable "$INSTDIR\${MAINBINARYNAME}.exe"

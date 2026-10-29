@@ -1,5 +1,5 @@
 {
-  "version": "0.1.5",
+  "version": "0.1.6",
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "active": true,
@@ -20,7 +20,7 @@
     "createUpdaterArtifacts": false
   },
   "build": {
-    "beforeBuildCommand": "pnpm run web:build",
+    "beforeBuildCommand": "pnpm run web:build && node scripts/build-pewpew-service.mjs",
     "frontendDist": "../dist",
     "beforeDevCommand": "pnpm run web:dev",
     "devUrl": "http://localhost:3000/",

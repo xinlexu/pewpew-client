@@ -1205,7 +1205,6 @@ dependencies = [
 [[package]]
 name = "clash_verge_service_ipc"
 version = "2.3.0"
-source = "git+https://github.com/clash-verge-rev/clash-verge-service-ipc#21e661fa141e5ad3c705ee4cdb86efff8df6f769"
 dependencies = [
  "anyhow",
  "compact_str",
@@ -5250,7 +5249,7 @@ dependencies = [
 
 [[package]]
 name = "pewpew-client"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "aes-gcm",
  "anyhow",

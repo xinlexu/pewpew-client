@@ -283,6 +283,40 @@ try {
     'PASS: setup order, no forced client exit, minimal process rights, checked flushes, no registry flush',
   )
 
+  assert.ok(template.includes('!define PEWPEW_SERVICE "pewpew_service"'))
+  assert.ok(
+    template.includes('!define PEWPEW_LEGACY_SERVICE "clash_verge_service"'),
+  )
+  assert.ok(
+    !macro('PewPewServiceAction ACTION').includes('clash_verge_service'),
+    'The current service must not use the name Clash Verge uses',
+  )
+  inOrder(
+    macro('PewPewPrepareFiles PREFIX'),
+    [
+      '!insertmacro PewPewServiceAction "stop"',
+      '!insertmacro PewPewRemoveLegacyService',
+      '!insertmacro PewPewOwnCores 1',
+      '!insertmacro PewPewCheckWritable',
+    ],
+    'The registration from 0.1.5 is removed before the files are checked',
+  )
+  inOrder(
+    macro('PewPewRemoveLegacyService'),
+    [
+      'Services\\${PEWPEW_LEGACY_SERVICE}" "ImagePath"',
+      '!insertmacro PewPewPlainPath $R9',
+      '${If} $R9 == "$INSTDIR\\resources\\clash-verge-service.exe"',
+      'SimpleSC::StopService "${PEWPEW_LEGACY_SERVICE}" 1 30',
+      'StrCpy $PewPewBlockedFile',
+      'SimpleSC::RemoveService "${PEWPEW_LEGACY_SERVICE}"',
+    ],
+    'Only the registration that runs this installation is removed',
+  )
+  console.log(
+    'PASS: the service registration from 0.1.5 is replaced only when it runs this installation',
+  )
+
   const plainOut = path.join(work, 'plain.txt')
   const samples = [
     '"C:\\A B\\svc.exe"',
