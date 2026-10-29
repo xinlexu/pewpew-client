@@ -1,5 +1,5 @@
 import {
-  SpeedRounded,
+  NetworkCheckRounded,
   SignalWifi0Bar as SignalNone,
   SignalWifi4Bar as SignalStrong,
 } from '@mui/icons-material'
@@ -265,7 +265,7 @@ export const CurrentProxyCard = ({
                 {testing ? (
                   <CircularProgress size={14} thickness={5} />
                 ) : (
-                  <SpeedRounded sx={{ fontSize: 18 }} />
+                  <NetworkCheckRounded sx={{ fontSize: 18 }} />
                 )}
               </IconButton>
             </span>

@@ -139,6 +139,9 @@ export const segmentedControlSx = (theme: Theme) => {
   const light = isLightTheme(theme)
   const brand = brandColor(theme)
   return {
+    // Padding and border stay inside the full width, so the track lines up
+    // with the cards around it.
+    boxSizing: 'border-box',
     p: 0.5,
     gap: 0.5,
     borderRadius: '14px',
