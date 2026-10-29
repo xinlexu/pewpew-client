@@ -235,7 +235,7 @@
       "smartMode": "智能模式",
       "smartModeDescription": "按订阅规则自动分流，推荐使用",
       "globalMode": "全局模式",
-      "globalModeDescription": "所有流量都经过当前线路",
+      "globalModeDescription": "所有流量都走当前线路，国内网站可能变慢",
       "routeChangeFailed": "线路切换失败，请稍后重试或联系客服",
       "directMode": "直连模式",
       "directModeHint": "当前是直连模式（可能来自托盘菜单），流量不经过线路。选择上方任一模式即可恢复",
@@ -392,7 +392,7 @@
       "again": "再测一次",
       "stop": "停止",
       "failed": "测速失败。请确认已经连接，稍后再试。",
-      "direct": "这次测速没有经过线路：分流规则让测速服务器直连，测到的是本地宽带速度。切到全局模式再测，就是线路速度。",
+      "direct": "这次测速没有经过线路：分流规则让测速服务器直连，测到的是本地宽带速度。想测线路速度，可以临时切到全局模式再测，测完记得切回智能模式。",
       "latency": "延迟 {{delay}}",
       "dataUsed": "用掉约 {{size}} 流量",
       "hint": "测速经过当前线路，从 Cloudflare 测速服务器下载，最长 8 秒，会消耗套餐流量。"

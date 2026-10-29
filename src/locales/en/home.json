@@ -235,7 +235,7 @@
       "smartMode": "Smart Mode",
       "smartModeDescription": "Splits traffic using your subscription's rules (recommended)",
       "globalMode": "Global Mode",
-      "globalModeDescription": "Sends all traffic through the selected route",
+      "globalModeDescription": "Sends all traffic through the selected route, so sites in China may load slower",
       "routeChangeFailed": "Route change failed. Please try again or contact support.",
       "directMode": "Direct Mode",
       "directModeHint": "Direct mode is on (possibly set from the tray), so traffic skips the route. Pick a mode above to switch back.",
@@ -392,7 +392,7 @@
       "again": "Test Again",
       "stop": "Stop",
       "failed": "The test failed. Make sure you're connected and try again.",
-      "direct": "This test did not use your route: the routing rules sent the test server direct, so it measured your local line. Switch to Global mode and test again to measure the route.",
+      "direct": "This test did not use your route: the routing rules sent the test server direct, so it measured your local line. To measure the route, switch to Global mode for the test, then switch back to Smart mode.",
       "latency": "Latency {{delay}}",
       "dataUsed": "Used about {{size}} of data",
       "hint": "The test runs through your current route and downloads from a Cloudflare test server for up to 8 seconds. It uses data from your plan."
