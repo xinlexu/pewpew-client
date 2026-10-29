@@ -33,7 +33,7 @@ pnpm tauri signer generate -w H:\Projects\PewPewClient\pewpew-updater.key --ci
 
    ```powershell
    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
-   pnpm tauri signer sign -f H:\Projects\PewPewClient\pewpew-updater.key "<安装包.exe>"
+   pnpm tauri signer sign -f H:\Projects\PewPewClient\pewpew-updater.key --password= "<安装包.exe>"
    ```
 
 3. 照常把安装包上传到这个版本的 Release。

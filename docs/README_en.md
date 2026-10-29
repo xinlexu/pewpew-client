@@ -8,7 +8,9 @@ A desktop client for PewPew Cloud subscriptions, built on Clash Verge Rev, mihom
 
 Start with the [current download section](../README.md#下载) and read the matching release notes and `SHA256SUMS.txt`. Packages are published in [this repository's Releases](https://github.com/xinlexu/pewpew-client/releases).
 
-As of 2026-10-28, the current package is **0.1.5 for Windows x64, an unsigned internal test build**. It is not a stable release. A system freeze was reported during 0.1.3 installation, and a background-exit problem was reported with 0.1.4; this build has not been verified to resolve those reports on real devices. Test in a Windows VM with a snapshot before considering wider use. No current macOS test package has been published.
+As of 2026-10-29, the current package is **0.1.6 for Windows x64, an unsigned internal test build**. It is not a stable release. A system freeze was reported during 0.1.3 installation, and a background-exit problem was reported with 0.1.4; this build has not been verified to resolve those reports on real devices. Test in a Windows VM with a snapshot before considering wider use. No current macOS test package has been published.
+
+Windows now uses its own `pewpew_service` service and control pipe instead of sharing Clash Verge's service identity. The first enhanced connection after upgrading requests administrator permission once. Only an old service belonging to PewPew's installation directory is migrated.
 
 The default proxy port is now `7966`. Version 0.1.4 and older users must install this build manually once. This build includes proxy-conflict warnings, support QR and feedback, and conservative Discord route probing in enhanced mode. Manual route choices take priority; streaming improvements are not guaranteed.
 

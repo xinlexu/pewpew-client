@@ -14,14 +14,15 @@ PewPew 云客户端是面向 PewPew 云用户的简化版桌面客户端，用�
 
 ## 下载
 
-**Windows x64 内测版（0.1.5，2026-10-28）：[下载安装包（.exe）](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.5-windows-test.20261028/PewPewCloud_0.1.5_windows-x64_test-20261028_setup.exe)**
+**Windows x64 内测版（0.1.6，2026-10-29）：[下载安装包（.exe）](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.6-windows-test.20261029/PewPewCloud_0.1.6_windows-x64_test-20261029_setup.exe)**
 
-[查看版本说明与已知问题](https://github.com/xinlexu/pewpew-client/releases/tag/v0.1.5-windows-test.20261028) · [SHA-256 校验文件](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.5-windows-test.20261028/SHA256SUMS.txt)
+[查看版本说明与已知问题](https://github.com/xinlexu/pewpew-client/releases/tag/v0.1.6-windows-test.20261029) · [SHA-256 校验文件](https://github.com/xinlexu/pewpew-client/releases/download/v0.1.6-windows-test.20261029/SHA256SUMS.txt)
 
 > **风险提示：0.1.3 安装期间曾报告整机无响应，根因尚未确认；0.1.4 也有客户端无法从后台退出的反馈。本包不能宣称已经修复卡死。请优先在有快照的 Windows 虚拟机测试，不建议在重要工作电脑直接覆盖安装或广泛分发。**
 
 - 本包未签名，仅供内部测试。Windows 可能提示未知发布者，请确认下载来源并核对校验值。
 - 本包已包含新版界面、标准 / 增强兼容模式，以及导入、线路选择和连接状态相关修复。
+- Windows 后台服务改用独立的 `pewpew_service` 和控制管道，避免与 Clash Verge 的服务共用标识。升级后第一次开启增强兼容会请求一次管理员授权；安装器只迁移属于 PewPew 安装目录的旧服务。
 - 默认代理端口改为 `7966`（SOCKS / HTTP 备用端口为 `7967` / `7968`），旧默认端口会自动迁移，自定义端口保留。检测到其他代理软件时建议先退出，端口被占用时可换端口连接。
 - 0.1.4 及更早版本需要手动安装一次。应用内更新功能已包含，但当前自动更新通道尚未启用，检查更新可能提示失败；真机验证后再启用推送。
 - 安装器不再强制结束客户端；请先断开连接并从托盘退出。残留核心仅在核对所属安装路径后尝试结束，等待或写入失败则中止安装。
@@ -31,7 +32,7 @@ PewPew 云客户端是面向 PewPew 云用户的简化版桌面客户端，用�
 
 ## 主要功能
 
-0.1.5 内测包增加客服二维码、反馈诊断信息、测速、连接前的其他代理软件提示，以及增强兼容模式下的 Discord 保守短测择优；手动选线优先，不保证直播提速。真实安装、增强兼容与 Discord 直播效果仍待用户验证。检测范围、流量预算和运维方式见 [Discord 线路检测](docs/discord-route-probe.md)。
+0.1.6 提供独立 Windows 后台服务，并调整全局模式和测速提示、首页切换条对齐及延迟刷新图标。保留客服二维码、反馈诊断信息、测速、代理软件提示，以及增强兼容模式下的 Discord 保守短测择优；手动选线优先，不保证直播提速。检测范围、流量预算和运维方式见 [Discord 线路检测](docs/discord-route-probe.md)。
 
 - 导入 PewPew 云订阅链接
 - 更新线路订阅
