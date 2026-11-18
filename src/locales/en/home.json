@@ -308,7 +308,9 @@
       "connection": "Connection",
       "autoCloseConnections": "Close old connections when switching routes",
       "autoCloseConnectionsHint": "Open connections move to the new route right away after you change routes or modes.",
-      "restoreHint": "If you quit while connected, the connection is restored the next time the client starts."
+      "restoreHint": "If you quit while connected, the connection is restored the next time the client starts.",
+      "autoSwitchRoute": "Switch routes automatically",
+      "autoSwitchRouteHint": "While connected, checks the route every 30 seconds and moves to the fastest working one if it stops answering"
     },
     "about": {
       "title": "About / Open Source Licenses",
@@ -325,7 +327,10 @@
       "autoSelected": "No valid route was selected, so {{name}} was chosen.",
       "noneSelected": "No route selected yet. One will be chosen when you connect.",
       "invalidWhileConnected": "No valid route is selected. Pick a route from the list.",
-      "switchedToSmart": "Direct mode skips the routes, so Smart Mode was turned on."
+      "switchedToSmart": "Direct mode skips the routes, so Smart Mode was turned on.",
+      "sortByDelay": "Sort by latency",
+      "sortByOrder": "Subscription order",
+      "otherRegion": "Other"
     },
     "support": {
       "wechatTitle": "Add Support on WeChat",
@@ -396,6 +401,59 @@
       "latency": "Latency {{delay}}",
       "dataUsed": "Used about {{size}} of data",
       "hint": "The test runs through your current route and downloads from a Cloudflare test server for up to 8 seconds. It uses data from your plan."
+    },
+    "check": {
+      "subtitle": "Checks each step from this computer to websites. Takes about 10 seconds and changes no settings.",
+      "testing": "Testing…",
+      "unreachable": "Unreachable",
+      "slow": "Slow {{delay}}",
+      "running": "Running",
+      "notRunning": "Not running",
+      "notConnected": "Not connected",
+      "notActive": "Not active",
+      "domestic": "Sites in China",
+      "foreign": "International sites",
+      "exit": "Exit location",
+      "exitUnknown": "Unavailable",
+      "networkSkipped": "Connect first to check the route and website access.",
+      "enhancedTip": "Games or voice chat not connecting?",
+      "copyReport": "Copy report",
+      "again": "Check again",
+      "switched": "Switched to {{name}} ({{delay}} ms)",
+      "section": {
+        "local": "This computer",
+        "route": "Route",
+        "sites": "Website access"
+      },
+      "action": {
+        "repair": "Restore network",
+        "fastestRoute": "Use fastest route",
+        "smartMode": "Back to Smart mode"
+      },
+      "verdict": {
+        "coreDown": "The connection core is not running. Click Restore network, or restart the client.",
+        "disconnected": "Not connected yet. If everything above looks fine, press the main button to connect.",
+        "portBusy": "Another program is using the local proxy port. Disconnect and connect again; PewPew will pick a free port.",
+        "enhancedMissing": "Enhanced mode is not active, so apps are not routed through PewPew.",
+        "systemProxyOff": "The system proxy was turned off, probably by another program.",
+        "directMode": "Direct mode is on, so traffic does not use the route.",
+        "routeDown": "The current route {{route}} does not answer.",
+        "foreignDown": "The route answers, but international sites do not open. Try another route.",
+        "foreignDownApps": "International sites do not open. {{apps}} is also running and may be taking over the network; quit it first.",
+        "domesticSlowGlobal": "In Global mode, sites in China also go through the route, so they are slow.",
+        "domesticSlowApps": "Sites in China are slow. {{apps}} is also running and may be taking over the network; quit it first.",
+        "domesticSlow": "Sites in China open slowly through PewPew ({{ms}} ms). Copy the report and send it to support.",
+        "domesticDown": "Sites in China do not open through PewPew. Copy the report and send it to support.",
+        "otherApps": "Everything works, but {{apps}} is also running and the two may compete for the network.",
+        "foreignSlow": "Working, but international sites are slow ({{ms}} ms). Try another route.",
+        "okGlobal": "Everything works. Global mode also routes sites in China; Smart mode is faster for everyday use.",
+        "ok": "Everything works: sites in China {{domestic}} ms, international sites {{foreign}} ms.",
+        "okPartial": "Everything works."
+      }
+    },
+    "failover": {
+      "switched": "Route {{from}} stopped answering; switched to {{to}} ({{delay}} ms)",
+      "allDown": "No route answers. This computer's network may be down."
     }
   }
 }

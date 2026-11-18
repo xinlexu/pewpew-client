@@ -61,6 +61,11 @@ import {
 } from '@/hooks/use-connection-state'
 import { useDailyUpdateCheck, usePewPewUpdate } from '@/hooks/use-pewpew-update'
 import { useProfiles } from '@/hooks/use-profiles'
+import {
+  readAutoSwitchRoute,
+  useRouteFailover,
+  writeAutoSwitchRoute,
+} from '@/hooks/use-route-failover'
 import { useRouteGuard, useRoutesBusy } from '@/hooks/use-route-guard'
 import { useVerge } from '@/hooks/use-verge'
 import {
@@ -217,6 +222,7 @@ const HomePage = () => {
   const [autoUpdateRoutesOnStartup, setAutoUpdateRoutesOnStartup] = useState(
     readAutoUpdateRoutesOnStartup,
   )
+  const [autoSwitchRoute, setAutoSwitchRoute] = useState(readAutoSwitchRoute)
   const [, refreshDelaySummary] = useReducer((value: number) => value + 1, 0)
   const startupUpdateRanRef = useRef(false)
   const routeRepairKeyRef = useRef('')
@@ -480,6 +486,19 @@ const HomePage = () => {
     [],
   )
 
+  const handleAutoSwitchRouteChange = useCallback((enabled: boolean) => {
+    writeAutoSwitchRoute(enabled)
+    setAutoSwitchRoute(enabled)
+  }, [])
+
+  useRouteFailover(
+    autoSwitchRoute &&
+      connectionEnabled &&
+      hasUsableRoutes &&
+      !accountEvaluation.blocked &&
+      !lineSyncing,
+  )
+
   // Another proxy app or a taken proxy port makes every route time out.
   const resolveConflicts = useCallback(
     async (config: Awaited<ReturnType<typeof getBaseConfig>>) => {
@@ -718,6 +737,7 @@ const HomePage = () => {
                 onConnectionError={setLastConnectionError}
                 connectionError={lastConnectionError}
                 onCopyDiagnostics={handleCopyDiagnostics}
+                buildDiagnostics={buildDiagnostics}
                 onRepairNetwork={handleRepairNetwork}
                 repairing={repairingNetwork}
                 statusDetail={statusDetail}
@@ -803,6 +823,8 @@ const HomePage = () => {
       />
       <PreferencesDialog
         autoUpdateRoutesOnStartup={autoUpdateRoutesOnStartup}
+        autoSwitchRoute={autoSwitchRoute}
+        onAutoSwitchRouteChange={handleAutoSwitchRouteChange}
         open={preferencesOpen}
         onClose={() => setPreferencesOpen(false)}
         onAutoUpdateRoutesOnStartupChange={

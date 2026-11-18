@@ -9,6 +9,7 @@ import { NoticeManager } from '@/components/layout/notice-manager'
 import {
   ClashConfigContext,
   ProxiesContext,
+  RefreshersContext,
   SystemContext,
 } from '@/providers/app-data-context'
 import { getSystemProxy } from '@/services/cmds'
@@ -85,6 +86,19 @@ mockIPC(
       }
       case 'plugin:mihomo|close_all_connections':
         return
+      // The connection check: route latency, site timings, exit lookup.
+      case 'plugin:mihomo|get_proxies':
+        return { proxies: structuredClone(proxies.records) }
+      case 'plugin:mihomo|get_proxy_providers':
+        return { providers: {} }
+      case 'plugin:mihomo|delay_proxy_by_name':
+        return { delay: 88 }
+      case 'test_delay':
+        return payload.url.includes('baidu') ? 110 : 520
+      case 'plugin:http|fetch':
+        throw new Error('offline')
+      case 'get_profiles':
+        return { current: null, items: [] }
       default:
         throw new Error(`Unexpected test command: ${command}`)
     }
@@ -110,6 +124,17 @@ const group = {
 const proxies = {
   groups: [group],
   records: { [route.name]: route, PROXY: group },
+}
+
+const refresh = () => Promise.resolve()
+const refreshers = {
+  refreshProxy: refresh,
+  refreshClashConfig: refresh,
+  refreshRules: refresh,
+  refreshSysproxy: refresh,
+  refreshProxyProviders: refresh,
+  refreshRuleProviders: refresh,
+  refreshAll: refresh,
 }
 
 function Fixture() {
@@ -141,13 +166,15 @@ function Fixture() {
           <ProxiesContext
             value={{ proxies, proxyProviders: {}, isProxiesPending: false }}
           >
-            <Box sx={{ width: '100%', maxWidth: 488, mx: 'auto', p: 3 }}>
-              <ProxyTunCard
-                hasRoute={!params.has('noRoute')}
-                onRepairNetwork={() => changeConnection({ enabled: false })}
-              />
-            </Box>
-            <NoticeManager />
+            <RefreshersContext value={refreshers}>
+              <Box sx={{ width: '100%', maxWidth: 488, mx: 'auto', p: 3 }}>
+                <ProxyTunCard
+                  hasRoute={!params.has('noRoute')}
+                  onRepairNetwork={() => changeConnection({ enabled: false })}
+                />
+              </Box>
+              <NoticeManager />
+            </RefreshersContext>
           </ProxiesContext>
         </SystemContext>
       </ClashConfigContext>

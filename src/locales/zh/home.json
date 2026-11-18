@@ -308,7 +308,9 @@
       "connection": "连接",
       "autoCloseConnections": "切换线路时断开旧连接",
       "autoCloseConnectionsHint": "切换线路或模式后，正在进行的连接会立即改用新线路",
-      "restoreHint": "退出时如果处于已连接状态，下次启动会自动恢复连接。"
+      "restoreHint": "退出时如果处于已连接状态，下次启动会自动恢复连接。",
+      "autoSwitchRoute": "线路断开时自动换线",
+      "autoSwitchRouteHint": "连接时每 30 秒检查一次当前线路，连不上就换到最快的可用线路"
     },
     "about": {
       "title": "关于 / 开源许可",
@@ -325,7 +327,10 @@
       "autoSelected": "未选中有效线路，已自动切换到：{{name}}",
       "noneSelected": "还没有选择线路，连接时会自动选择",
       "invalidWhileConnected": "当前没有选中有效线路，请在右侧选择线路",
-      "switchedToSmart": "直连模式不经过线路，已切换到智能模式"
+      "switchedToSmart": "直连模式不经过线路，已切换到智能模式",
+      "sortByDelay": "按延迟排序",
+      "sortByOrder": "按订阅顺序",
+      "otherRegion": "其他"
     },
     "support": {
       "wechatTitle": "添加客服微信",
@@ -396,6 +401,59 @@
       "latency": "延迟 {{delay}}",
       "dataUsed": "用掉约 {{size}} 流量",
       "hint": "测速经过当前线路，从 Cloudflare 测速服务器下载，最长 8 秒，会消耗套餐流量。"
+    },
+    "check": {
+      "subtitle": "从电脑到网站逐段检查，大约 10 秒，不会改动任何设置。",
+      "testing": "检测中…",
+      "unreachable": "连不上",
+      "slow": "较慢 {{delay}}",
+      "running": "运行中",
+      "notRunning": "没有运行",
+      "notConnected": "未连接",
+      "notActive": "没有生效",
+      "domestic": "国内网站",
+      "foreign": "国外网站",
+      "exit": "出口地区",
+      "exitUnknown": "未获取到",
+      "networkSkipped": "连接后才能检查线路和网站访问。",
+      "enhancedTip": "游戏或语音连不上？",
+      "copyReport": "复制诊断报告",
+      "again": "重新检查",
+      "switched": "已换到 {{name}}（{{delay}} ms）",
+      "section": {
+        "local": "本机",
+        "route": "线路",
+        "sites": "网站访问"
+      },
+      "action": {
+        "repair": "恢复网络",
+        "fastestRoute": "换到最快线路",
+        "smartMode": "切回智能模式"
+      },
+      "verdict": {
+        "coreDown": "连接核心没有运行。点“恢复网络”，不行就重启客户端。",
+        "disconnected": "还没连接。本机一切正常的话，点中间的按钮就能连上。",
+        "portBusy": "本地代理端口被其他程序占用了。断开后重新连接，PewPew 会换一个空闲端口。",
+        "enhancedMissing": "增强兼容没有生效，应用的网络没被接管。",
+        "systemProxyOff": "系统代理被关掉了，可能是其他软件改了设置。",
+        "directMode": "当前是直连模式，流量不经过线路。",
+        "routeDown": "当前线路 {{route}} 连不上。",
+        "foreignDown": "线路能连上，但打不开国外网站，换一条线路试试。",
+        "foreignDownApps": "打不开国外网站。{{apps}} 也在运行，可能在抢网络，建议先退出它。",
+        "domesticSlowGlobal": "全局模式下国内网站也要绕到线路上，所以很慢。",
+        "domesticSlowApps": "国内网站很慢。{{apps}} 也在运行，可能在抢网络，建议先退出它。",
+        "domesticSlow": "经过 PewPew 打开国内网站很慢（{{ms}} ms）。请复制诊断报告发给客服。",
+        "domesticDown": "经过 PewPew 打不开国内网站。请复制诊断报告发给客服。",
+        "otherApps": "可以正常使用，但 {{apps}} 也在运行，两个软件可能互相抢网络。",
+        "foreignSlow": "可以使用，但国外网站较慢（{{ms}} ms），可以换条线路试试。",
+        "okGlobal": "一切正常。现在是全局模式，国内网站也走线路，平时用智能模式更快。",
+        "ok": "一切正常：国内网站 {{domestic}} ms，国外网站 {{foreign}} ms。",
+        "okPartial": "一切正常。"
+      }
+    },
+    "failover": {
+      "switched": "线路 {{from}} 连不上，已自动换到 {{to}}（{{delay}} ms）",
+      "allDown": "所有线路都连不上，可能是这台电脑的网络断了。"
     }
   }
 }

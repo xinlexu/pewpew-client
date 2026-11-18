@@ -87,6 +87,8 @@ const DialogHeader = ({
 
 export const PreferencesDialog = ({
   autoUpdateRoutesOnStartup,
+  autoSwitchRoute,
+  onAutoSwitchRouteChange,
   open,
   onClose,
   onAutoUpdateRoutesOnStartupChange,
@@ -95,6 +97,8 @@ export const PreferencesDialog = ({
   repairingNetwork,
 }: {
   autoUpdateRoutesOnStartup: boolean
+  autoSwitchRoute: boolean
+  onAutoSwitchRouteChange: (enabled: boolean) => void
   open: boolean
   onClose: () => void
   onAutoUpdateRoutesOnStartupChange: (enabled: boolean) => void
@@ -260,6 +264,13 @@ export const PreferencesDialog = ({
           </PreferenceSection>
 
           <PreferenceSection title={t('home.pewpew.preferences.connection')}>
+            <PreferenceSwitch
+              label={t('home.pewpew.preferences.autoSwitchRoute')}
+              description={t('home.pewpew.preferences.autoSwitchRouteHint')}
+              checked={autoSwitchRoute}
+              disabled={preferenceDisabled}
+              onChange={onAutoSwitchRouteChange}
+            />
             <PreferenceSwitch
               label={t('home.pewpew.preferences.autoCloseConnections')}
               description={t(

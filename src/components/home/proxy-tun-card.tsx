@@ -1,19 +1,14 @@
 import {
   BuildRounded,
-  CheckCircleRounded,
   ContentCopyRounded,
-  HelpOutlineRounded,
-  RemoveCircleOutlineRounded,
   ShieldOutlined,
   SpeedRounded,
   TroubleshootRounded,
-  WarningAmberRounded,
 } from '@mui/icons-material'
 import {
   Box,
   Alert,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -49,20 +44,11 @@ import {
   useClashConfigData,
   useProxiesData,
 } from '@/providers/app-data-context'
-import {
-  detectProxyConflicts,
-  getDiscordProbeStatus,
-  isServiceAvailable,
-  type DiscordProbeStatus,
-} from '@/services/cmds'
-import { readConnectionState } from '@/services/connection'
 import { showNotice } from '@/services/notice-service'
-import {
-  configuredMixedPort,
-  isProxyPortOpen,
-} from '@/services/proxy-conflicts'
 import type { ConnectionMode } from '@/utils/connection-state'
 import { resolvePewPewProxyGroup } from '@/utils/pewpew-client'
+
+import { ConnectionCheckDialog } from './connection-check-dialog'
 
 interface ProxyTunCardProps {
   disabled?: boolean
@@ -72,6 +58,8 @@ interface ProxyTunCardProps {
   repairing?: boolean
   onRepairNetwork?: () => Promise<void>
   onCopyDiagnostics?: () => Promise<void>
+  // Full diagnostics text; the connection check appends its results.
+  buildDiagnostics?: () => Promise<string>
   onConnectionError?: (message: string) => void
   // Last error owned by the page; an empty string clears a stale failure.
   connectionError?: string
@@ -148,11 +136,6 @@ const statusSwap = keyframes`
 `
 
 // Diagnostic rows appear one after another.
-const rowIn = keyframes`
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
-`
-
 export const ProxyTunCard: FC<ProxyTunCardProps> = ({
   disabled = false,
   hasRoute = true,
@@ -161,6 +144,7 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
   repairing = false,
   onRepairNetwork,
   onCopyDiagnostics,
+  buildDiagnostics,
   onConnectionError,
   connectionError,
   statusDetail,
@@ -192,20 +176,8 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
     null,
   )
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
-  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
-  const [diagnostics, setDiagnostics] = useState<{
-    systemProxy: boolean
-    tun: boolean
-    service: boolean
-    core: boolean
-    // Local proxy port, and whether the core could open it.
-    port: number
-    portOpen: boolean
-    // Other running proxy apps; null when they could not be listed.
-    otherApps: string[] | null
-    discord: DiscordProbeStatus | null
-  } | null>(null)
-  const [diagnosticsFailed, setDiagnosticsFailed] = useState(false)
+  // Mounted on first use, then kept so closing can animate.
+  const [checkMounted, setCheckMounted] = useState(false)
 
   const busy = changing || phase !== 'idle' || repairing
 
@@ -366,34 +338,10 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
     },
   )
 
-  const inspectConnection = useLockFn(async () => {
+  const inspectConnection = () => {
+    setCheckMounted(true)
     setDiagnosticsOpen(true)
-    setDiagnosticsLoading(true)
-    setDiagnosticsFailed(false)
-    setDiagnostics(null)
-    try {
-      const [state, service, conflicts, discord] = await Promise.all([
-        readConnectionState(),
-        isServiceAvailable().catch(() => false),
-        detectProxyConflicts().catch(() => null),
-        getDiscordProbeStatus().catch(() => null),
-      ])
-      setDiagnostics({
-        systemProxy: state.systemProxy,
-        tun: state.tun,
-        service,
-        core: !!state.config,
-        port: configuredMixedPort(state.settings, state.config),
-        portOpen: isProxyPortOpen(state.config),
-        otherApps: conflicts?.apps ?? null,
-        discord,
-      })
-    } catch {
-      setDiagnosticsFailed(true)
-    } finally {
-      setDiagnosticsLoading(false)
-    }
-  })
+  }
 
   const handleRepair = useLockFn(async () => {
     try {
@@ -405,77 +353,6 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
       reportError(error, 'repair', false)
     }
   })
-
-  const diagnosticsSummary = (() => {
-    if (!diagnostics) return null
-    if (!diagnostics.core)
-      return {
-        severity: 'error' as const,
-        key: 'home.pewpew.compatibility.summaryCoreDown',
-      }
-    if (diagnostics.systemProxy || diagnostics.tun) {
-      if (mode === 'enhanced' && !diagnostics.tun)
-        return {
-          severity: 'warning' as const,
-          key: 'home.pewpew.compatibility.summaryEnhancedMissing',
-        }
-      return {
-        severity: 'success' as const,
-        key:
-          mode === 'enhanced'
-            ? 'home.pewpew.compatibility.summaryEnhancedActive'
-            : 'home.pewpew.compatibility.summaryStandardActive',
-      }
-    }
-    return {
-      severity: 'info' as const,
-      key: 'home.pewpew.compatibility.summaryDisconnected',
-    }
-  })()
-
-  const renderStateIcon = (state: 'ok' | 'off' | 'warn' | 'unknown') => {
-    const sx = { fontSize: 18 }
-    if (state === 'ok')
-      return <CheckCircleRounded sx={{ ...sx, color: 'success.main' }} />
-    if (state === 'warn')
-      return <WarningAmberRounded sx={{ ...sx, color: 'warning.main' }} />
-    if (state === 'unknown')
-      return <HelpOutlineRounded sx={{ ...sx, color: 'text.disabled' }} />
-    return <RemoveCircleOutlineRounded sx={{ ...sx, color: 'text.disabled' }} />
-  }
-
-  const renderDiagnosticRow = (
-    label: string,
-    value: string,
-    state: 'ok' | 'off' | 'warn' | 'unknown',
-    index = 0,
-  ) => (
-    <Stack
-      key={label}
-      direction="row"
-      spacing={2}
-      sx={{
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        py: 0.9,
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        '&:last-of-type': { borderBottom: 0 },
-        animation: `${rowIn} 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both`,
-        animationDelay: `${index * 45}ms`,
-        [reducedMotion]: { animation: 'none' },
-      }}
-    >
-      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-        {label}
-      </Typography>
-      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-        {renderStateIcon(state)}
-        <Typography variant="body2" color="text.secondary">
-          {value}
-        </Typography>
-      </Stack>
-    </Stack>
-  )
 
   return (
     <Stack spacing={1.5} sx={{ alignItems: 'center', textAlign: 'center' }}>
@@ -667,8 +544,8 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
         <Button
           size="small"
           startIcon={<TroubleshootRounded />}
-          disabled={busy || diagnosticsLoading}
-          onClick={() => void inspectConnection()}
+          disabled={busy}
+          onClick={inspectConnection}
           sx={pillButtonSx}
         >
           {t('home.pewpew.compatibility.check')}
@@ -724,155 +601,22 @@ export const ProxyTunCard: FC<ProxyTunCardProps> = ({
         </DialogActions>
       </Dialog>
 
-      <Dialog
-        open={diagnosticsOpen}
-        onClose={() => setDiagnosticsOpen(false)}
-        fullWidth
-        maxWidth="xs"
-        className="pewpew-dialog"
-        slotProps={{
-          paper: { sx: dialogPaperSx },
-          backdrop: { sx: dialogBackdropSx },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 800 }}>
-          {t('home.pewpew.compatibility.check')}
-        </DialogTitle>
-        <DialogContent>
-          {diagnosticsLoading && (
-            <Stack
-              direction="row"
-              spacing={1.25}
-              sx={{ alignItems: 'center', py: 1 }}
-            >
-              <CircularProgress
-                size={20}
-                aria-label={t('home.pewpew.compatibility.checking')}
-              />
-              <Typography variant="body2" color="text.secondary">
-                {t('home.pewpew.compatibility.checking')}
-              </Typography>
-            </Stack>
-          )}
-          {diagnosticsFailed && (
-            <Alert severity="error" sx={{ borderRadius: '12px' }}>
-              {t('home.pewpew.compatibility.checkFailed')}
-            </Alert>
-          )}
-          {diagnostics && (
-            <Stack spacing={1.5}>
-              {diagnosticsSummary && (
-                <Alert
-                  severity={diagnosticsSummary.severity}
-                  sx={{ borderRadius: '12px' }}
-                >
-                  {t(diagnosticsSummary.key)}
-                </Alert>
-              )}
-              <Box>
-                {(
-                  [
-                    ['core', diagnostics.core],
-                    ['systemProxy', diagnostics.systemProxy],
-                    ['enhanced', diagnostics.tun],
-                    ['service', diagnostics.service],
-                  ] as const
-                ).map(([label, active], index) =>
-                  renderDiagnosticRow(
-                    t(`home.pewpew.compatibility.${label}`),
-                    t(
-                      `home.pewpew.compatibility.${active ? 'active' : 'inactive'}`,
-                    ),
-                    active ? 'ok' : 'off',
-                    index,
-                  ),
-                )}
-                {renderDiagnosticRow(
-                  t('home.pewpew.compatibility.udp'),
-                  t(
-                    `home.pewpew.compatibility.${udp === true ? 'supported' : udp === false ? 'unsupported' : 'unknown'}`,
-                  ),
-                  udp === true ? 'ok' : udp === false ? 'warn' : 'unknown',
-                  4,
-                )}
-                {diagnostics.core &&
-                  renderDiagnosticRow(
-                    t('home.pewpew.compatibility.port'),
-                    t(
-                      diagnostics.portOpen
-                        ? 'home.pewpew.compatibility.portListening'
-                        : 'home.pewpew.compatibility.portBusy',
-                      { port: diagnostics.port },
-                    ),
-                    diagnostics.portOpen ? 'ok' : 'warn',
-                    5,
-                  )}
-                {renderDiagnosticRow(
-                  t('home.pewpew.compatibility.otherApps'),
-                  diagnostics.otherApps === null
-                    ? t('home.pewpew.compatibility.unknown')
-                    : diagnostics.otherApps.length
-                      ? diagnostics.otherApps.join(', ')
-                      : t('home.pewpew.compatibility.noOtherApps'),
-                  diagnostics.otherApps === null
-                    ? 'unknown'
-                    : diagnostics.otherApps.length
-                      ? 'warn'
-                      : 'ok',
-                  6,
-                )}
-                {diagnostics.tun &&
-                  renderDiagnosticRow(
-                    t('home.pewpew.discord.label'),
-                    t(
-                      `home.pewpew.discord.${diagnostics.discord?.state ?? 'following'}`,
-                      {
-                        route: diagnostics.discord?.route ?? '',
-                      },
-                    ),
-                    diagnostics.discord?.state === 'selected'
-                      ? 'ok'
-                      : 'unknown',
-                    7,
-                  )}
-              </Box>
-              {!!diagnostics.otherApps?.length && (
-                <Alert severity="warning" sx={{ borderRadius: '12px' }}>
-                  {t('home.pewpew.conflict.apps', {
-                    apps: diagnostics.otherApps.join(', '),
-                  })}
-                </Alert>
-              )}
-              {udp === false && (
-                <Alert severity="warning" sx={{ borderRadius: '12px' }}>
-                  {t('home.pewpew.compatibility.udpUnsupported')}
-                </Alert>
-              )}
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          {mode === 'standard' && (
-            <Button
-              disabled={busy || disabled || diagnosticsLoading}
-              sx={{ ...pillButtonSx, mr: 'auto' }}
-              onClick={() => {
-                setDiagnosticsOpen(false)
-                void selectMode('enhanced')
-              }}
-            >
-              {t('home.pewpew.compatibility.switchToEnhanced')}
-            </Button>
-          )}
-          <Button
-            variant="contained"
-            onClick={() => setDiagnosticsOpen(false)}
-            sx={pillButtonSx}
-          >
-            {t('shared.actions.close')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {checkMounted && (
+        <ConnectionCheckDialog
+          open={diagnosticsOpen}
+          onClose={() => setDiagnosticsOpen(false)}
+          connected={enabled}
+          mode={mode}
+          busy={busy || disabled}
+          udp={udp}
+          onRepair={onRepairNetwork ? handleRepair : undefined}
+          onSwitchEnhanced={() => {
+            setDiagnosticsOpen(false)
+            void selectMode('enhanced')
+          }}
+          buildDiagnostics={buildDiagnostics}
+        />
+      )}
     </Stack>
   )
 }

@@ -202,6 +202,55 @@ export interface TranslationResources {
           usage: string
           usedOfTotal: string
         }
+        check: {
+          action: {
+            fastestRoute: string
+            repair: string
+            smartMode: string
+          }
+          again: string
+          copyReport: string
+          domestic: string
+          enhancedTip: string
+          exit: string
+          exitUnknown: string
+          foreign: string
+          networkSkipped: string
+          notActive: string
+          notConnected: string
+          notRunning: string
+          running: string
+          section: {
+            local: string
+            route: string
+            sites: string
+          }
+          slow: string
+          subtitle: string
+          switched: string
+          testing: string
+          unreachable: string
+          verdict: {
+            coreDown: string
+            directMode: string
+            disconnected: string
+            domesticDown: string
+            domesticSlow: string
+            domesticSlowApps: string
+            domesticSlowGlobal: string
+            enhancedMissing: string
+            foreignDown: string
+            foreignDownApps: string
+            foreignSlow: string
+            ok: string
+            okGlobal: string
+            okPartial: string
+            otherApps: string
+            portBusy: string
+            routeDown: string
+            systemProxyOff: string
+          }
+        }
         compatibility: {
           active: string
           allow: string
@@ -308,6 +357,10 @@ export interface TranslationResources {
           selected: string
           testing: string
         }
+        failover: {
+          allDown: string
+          switched: string
+        }
         header: {
           about: string
           addWechat: string
@@ -332,6 +385,8 @@ export interface TranslationResources {
           autoCloseConnections: string
           autoCloseConnectionsHint: string
           autoLaunch: string
+          autoSwitchRoute: string
+          autoSwitchRouteHint: string
           autoUpdateRoutesOnStartup: string
           connection: string
           dark: string
@@ -348,6 +403,9 @@ export interface TranslationResources {
           autoSelected: string
           invalidWhileConnected: string
           noneSelected: string
+          otherRegion: string
+          sortByDelay: string
+          sortByOrder: string
           switchedToSmart: string
         }
         speedTest: {

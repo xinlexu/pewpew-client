@@ -557,12 +557,163 @@ await check(
     assert.ok(
       await dialog.getByText('其他代理软件', { exact: true }).isVisible(),
     )
-    assert.ok(
-      await dialog
-        .getByText(/检测到其他代理软件正在运行：Clash Verge/)
-        .isVisible(),
-    )
+    await dialog.getByText(/可以正常使用，但 Clash Verge 也在运行/).waitFor()
     assert.equal(await dialog.getByText('语音连通性').count(), 0)
+  },
+)
+
+const runCheck = async (page) => {
+  await page.getByRole('button', { name: '检查连接' }).click()
+  const dialog = page.getByRole('dialog', { name: '检查连接' })
+  await dialog.getByRole('button', { name: '重新检查' }).waitFor()
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('[role=dialog] button')].some(
+      (b) => b.textContent === '重新检查' && !b.disabled,
+    ),
+  )
+  return dialog
+}
+
+await check(
+  'connection check times both kinds of sites and says all is well',
+  async ({ page, open }) => {
+    await open('scenario=connected')
+    const dialog = await runCheck(page)
+    await dialog
+      .getByText('一切正常：国内网站 120 ms，国外网站 640 ms。')
+      .waitFor()
+    for (const label of ['本机', '线路', '网站访问', '国内网站', '国外网站'])
+      assert.ok(await dialog.getByText(label, { exact: true }).isVisible())
+    assert.ok(await dialog.getByText('🇭🇰 香港 01', { exact: true }).isVisible())
+    await dialog
+      .getByText('未获取到', { exact: true })
+      .waitFor({ timeout: 9000 })
+    assert.equal(
+      await dialog.getByRole('button', { name: '切回智能模式' }).count(),
+      0,
+    )
+  },
+)
+
+await check(
+  'slow sites in China in Global mode lead back to Smart mode',
+  async ({ page, open, state }) => {
+    await open('scenario=connected&mode=global&globalDomesticMs=2600')
+    const dialog = await runCheck(page)
+    await dialog.getByText(/全局模式下国内网站也要绕到线路上/).waitFor()
+    assert.ok(await dialog.getByText('较慢 2600 ms').isVisible())
+    await dialog.getByRole('button', { name: '切回智能模式' }).click()
+    await page.waitForFunction(
+      () => window.homeTest.state.config.mode === 'rule',
+    )
+    assert.equal((await state()).config.mode, 'rule')
+    // The check runs again after the fix.
+    await dialog.getByText(/一切正常/).waitFor()
+  },
+)
+
+await check(
+  'a dead route is reported and replaced by the fastest one',
+  async ({ page, open, toasts }) => {
+    await open(
+      `scenario=connected&noAutoSwitch&foreignMs=10000&deadRoutes=${encodeURIComponent('🇭🇰 香港 01')}`,
+    )
+    const dialog = await runCheck(page)
+    await dialog.getByText('当前线路 🇭🇰 香港 01 连不上。').waitFor()
+    await dialog.getByRole('button', { name: '换到最快线路' }).click()
+    await page.waitForFunction(
+      () => window.homeTest.records['PewPew 云'].now !== '🇭🇰 香港 01',
+      null,
+      { timeout: 15000 },
+    )
+    assert.notEqual(await groupNow(page, 'PewPew 云'), '🇭🇰 香港 01')
+    assert.ok((await toasts()).some((t) => t.startsWith('已换到')))
+  },
+)
+
+await check(
+  'the check skips network tests until connected',
+  async ({ page, open }) => {
+    await open('')
+    const dialog = await runCheck(page)
+    await dialog.getByText(/还没连接/).waitFor()
+    assert.ok(
+      await dialog.getByText('连接后才能检查线路和网站访问。').isVisible(),
+    )
+    assert.equal((await commandsIn(page, ['test_delay'])).length, 0)
+  },
+)
+
+await check(
+  'a route that stops answering is switched automatically',
+  async ({ page, open, toasts }) => {
+    await page.clock.install()
+    await open(
+      `scenario=connected&deadRoutes=${encodeURIComponent('🇭🇰 香港 01')}`,
+    )
+    await page.clock.fastForward(31_000)
+    await page.waitForTimeout(500)
+    await page.clock.fastForward(6_000)
+    await page.waitForFunction(
+      () => window.homeTest.records['PewPew 云'].now !== '🇭🇰 香港 01',
+      null,
+      { timeout: 15000 },
+    )
+    await page.waitForTimeout(300)
+    assert.ok(
+      (await toasts()).some((t) =>
+        t.startsWith('线路 🇭🇰 香港 01 连不上，已自动换到'),
+      ),
+    )
+  },
+)
+
+await check('automatic switching can be turned off', async ({ page, open }) => {
+  await page.clock.install()
+  await open(
+    `scenario=connected&noAutoSwitch&deadRoutes=${encodeURIComponent('🇭🇰 香港 01')}`,
+  )
+  await page.clock.fastForward(31_000)
+  await page.waitForTimeout(500)
+  await page.clock.fastForward(6_000)
+  await page.waitForTimeout(1500)
+  assert.equal(await groupNow(page, 'PewPew 云'), '🇭🇰 香港 01')
+  await page.getByRole('button', { name: '偏好设置' }).click()
+  const toggle = page.getByLabel('线路断开时自动换线')
+  await toggle.waitFor()
+  assert.equal(await toggle.isChecked(), false)
+})
+
+await check(
+  'route lists sort by latency and remember the choice',
+  async ({ page, open }) => {
+    await open('scenario=connected')
+    const names = () =>
+      page.locator('.MuiMenuItem-root .MuiTypography-root').allTextContents()
+    await page.getByRole('combobox').click()
+    await page.getByRole('option').first().waitFor({ state: 'visible' })
+    assert.equal((await names())[0], '🇭🇰 香港 01')
+    // About one route per region: no region headers.
+    assert.equal(await page.locator('.MuiListSubheader-root').count(), 0)
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: '按延迟排序' }).click()
+    await page.getByRole('combobox').click()
+    await page.getByRole('option').first().waitFor({ state: 'visible' })
+    assert.deepEqual(await names(), [
+      '🇯🇵 日本 01',
+      '🇭🇰 香港 01',
+      '🇰🇷 韩国 01',
+      '🇭🇰 香港 02',
+      '🇬🇧 英国 01',
+      '🇸🇬 新加坡 01',
+      '🇺🇸 美国 01',
+      '🇹🇼 台湾 01',
+    ])
+    await page.keyboard.press('Escape')
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem('pewpew-route-sort')),
+      'delay',
+    )
   },
 )
 

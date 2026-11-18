@@ -2,6 +2,7 @@ import {
   NetworkCheckRounded,
   SignalWifi0Bar as SignalNone,
   SignalWifi4Bar as SignalStrong,
+  SortRounded,
 } from '@mui/icons-material'
 import {
   Box,
@@ -9,6 +10,7 @@ import {
   CircularProgress,
   FormControl,
   IconButton,
+  ListSubheader,
   MenuItem,
   Select,
   SelectChangeEvent,
@@ -51,6 +53,13 @@ import {
   PewPewProxyOption,
   resolvePewPewProxyGroup,
 } from '@/utils/pewpew-client'
+import {
+  arrangeRoutes,
+  regionFlag,
+  regionName,
+  type RouteSection,
+  type RouteSort,
+} from '@/utils/route-health'
 
 interface CurrentProxyCardProps {
   embedded?: boolean
@@ -64,6 +73,23 @@ interface CurrentProxyCardProps {
 
 const DELAY_CHECK_INTERVAL = 60 * 1000
 const DELAY_TIMEOUT = 5000
+const ROUTE_SORT_KEY = 'pewpew-route-sort'
+
+const readRouteSort = (): RouteSort => {
+  try {
+    return localStorage.getItem(ROUTE_SORT_KEY) === 'delay'
+      ? 'delay'
+      : 'default'
+  } catch {
+    return 'default'
+  }
+}
+
+const writeRouteSort = (sort: RouteSort) => {
+  try {
+    localStorage.setItem(ROUTE_SORT_KEY, sort)
+  } catch {}
+}
 
 const getLineDelayValue = (proxy: PewPewProxyOption, groupName: string) => {
   const cached = delayManager.getDelayUpdate(proxy.name, groupName)
@@ -106,7 +132,7 @@ export const CurrentProxyCard = ({
   onDelayUpdated,
 }: CurrentProxyCardProps) => {
   const theme = useTheme()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { proxies } = useProxiesData()
   const { clashConfig } = useClashConfigData()
   const { refreshProxy } = useAppRefreshers()
@@ -115,6 +141,10 @@ export const CurrentProxyCard = ({
   const lastDelayCheckAtRef = useRef<Record<string, number>>({})
   const [, forceDelayRender] = useReducer((value: number) => value + 1, 0)
   const [testing, setTesting] = useState(false)
+  const [sort, setSort] = useState<RouteSort>(readRouteSort)
+  // Order shown while the menu is open, so results arriving from a delay test
+  // update the chips without moving rows under the pointer.
+  const [frozenOrder, setFrozenOrder] = useState<RouteSection[] | null>(null)
 
   const { group, options, currentName } = useMemo(
     () => resolvePewPewProxyGroup(proxies, clashConfig?.mode),
@@ -127,6 +157,48 @@ export const CurrentProxyCard = ({
 
   const selectedValue = currentLine?.name || ''
   const groupName = group?.name || ''
+
+  // Sorting uses the last finished test, so routes being tested again keep
+  // their place instead of dropping to the end.
+  const arrange = useCallback(
+    (by: RouteSort) =>
+      arrangeRoutes(options, by, (option) => {
+        const cached = delayManager.getDelayUpdate(option.name, groupName)
+        if (cached && cached.delay > 0) return cached.delay
+        return option.record.history?.at(-1)?.delay ?? null
+      }),
+    [groupName, options],
+  )
+
+  // Rebuild the frozen order with the current route objects; routes added
+  // since the menu opened go last.
+  const sections = useMemo(() => {
+    if (!frozenOrder) return arrange(sort)
+    const byName = new Map(options.map((option) => [option.name, option]))
+    const seen = new Set<string>()
+    const result = frozenOrder
+      .map((section) => ({
+        region: section.region,
+        options: section.options
+          .map((option) => byName.get(option.name))
+          .filter((option): option is PewPewProxyOption => {
+            if (!option) return false
+            seen.add(option.name)
+            return true
+          }),
+      }))
+      .filter((section) => section.options.length > 0)
+    const added = options.filter((option) => !seen.has(option.name))
+    if (added.length) result.push({ region: null, options: added })
+    return result
+  }, [arrange, frozenOrder, options, sort])
+
+  const toggleSort = () => {
+    const next: RouteSort = sort === 'delay' ? 'default' : 'delay'
+    writeRouteSort(next)
+    setSort(next)
+    setFrozenOrder(null)
+  }
 
   const { changeProxy } = useProxySelection({
     onSuccess: () => {
@@ -234,6 +306,20 @@ export const CurrentProxyCard = ({
     }),
   }
 
+  const subheaderSx = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    lineHeight: '30px',
+    px: 2,
+    fontSize: 12,
+    fontWeight: 700,
+    color: 'text.secondary',
+    // Opaque enough that rows scrolling underneath stay hidden.
+    bgcolor: isLightTheme(theme)
+      ? alpha('#f4f7ff', 0.96)
+      : alpha('#1b2440', 0.98),
+  }
+
   const selectedDelay = currentLine
     ? formatLineDelay(currentLine, groupName, t)
     : null
@@ -253,23 +339,49 @@ export const CurrentProxyCard = ({
           {t('home.pewpew.connection.route')}
         </Typography>
         {!routeBlocked && group && options.length > 0 && (
-          <Tooltip title={t('home.pewpew.delay.refresh')}>
-            <span>
-              <IconButton
-                size="small"
-                onClick={() => void checkVisibleLineDelay(true)}
-                aria-label={t('home.pewpew.delay.refresh')}
-                disabled={testing || disabled}
-                sx={{ width: 28, height: 28, color: 'text.secondary' }}
-              >
-                {testing ? (
-                  <CircularProgress size={14} thickness={5} />
-                ) : (
-                  <NetworkCheckRounded sx={{ fontSize: 18 }} />
+          <Stack direction="row" spacing={0.25}>
+            {options.length > 1 && (
+              <Tooltip
+                title={t(
+                  sort === 'delay'
+                    ? 'home.pewpew.route.sortByOrder'
+                    : 'home.pewpew.route.sortByDelay',
                 )}
-              </IconButton>
-            </span>
-          </Tooltip>
+              >
+                <IconButton
+                  size="small"
+                  onClick={toggleSort}
+                  aria-label={t('home.pewpew.route.sortByDelay')}
+                  aria-pressed={sort === 'delay'}
+                  disabled={disabled}
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    color: sort === 'delay' ? 'primary.main' : 'text.secondary',
+                  }}
+                >
+                  <SortRounded sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Tooltip title={t('home.pewpew.delay.refresh')}>
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => void checkVisibleLineDelay(true)}
+                  aria-label={t('home.pewpew.delay.refresh')}
+                  disabled={testing || disabled}
+                  sx={{ width: 28, height: 28, color: 'text.secondary' }}
+                >
+                  {testing ? (
+                    <CircularProgress size={14} thickness={5} />
+                  ) : (
+                    <NetworkCheckRounded sx={{ fontSize: 18 }} />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
         )}
       </Stack>
 
@@ -326,7 +438,11 @@ export const CurrentProxyCard = ({
           <Select
             value={selectedValue}
             onChange={handleLineChange}
-            onOpen={() => void checkVisibleLineDelay(false)}
+            onOpen={() => {
+              setFrozenOrder(arrange(sort))
+              void checkVisibleLineDelay(false)
+            }}
+            onClose={() => setFrozenOrder(null)}
             disabled={disabled}
             displayEmpty
             inputProps={{ 'aria-label': t('home.pewpew.connection.route') }}
@@ -373,35 +489,51 @@ export const CurrentProxyCard = ({
               },
             }}
           >
-            {options.map((proxy) => {
-              const delay = formatLineDelay(proxy, groupName, t)
-              return (
-                <MenuItem
-                  key={proxy.name}
-                  value={proxy.name}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 1,
-                    minHeight: 40,
-                    maxWidth: '100%',
-                  }}
+            {sections.flatMap((section) => {
+              const items = section.options.map((proxy) => {
+                const delay = formatLineDelay(proxy, groupName, t)
+                return (
+                  <MenuItem
+                    key={proxy.name}
+                    value={proxy.name}
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 1,
+                      minHeight: 40,
+                      maxWidth: '100%',
+                    }}
+                  >
+                    <Typography noWrap sx={{ minWidth: 0, flex: 1 }}>
+                      {proxy.name}
+                    </Typography>
+                    {delay && (
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={delay.label}
+                        color={delay.color}
+                        sx={delayChipSx}
+                      />
+                    )}
+                  </MenuItem>
+                )
+              })
+              if (sections.length < 2) return items
+              const label = section.region
+                ? `${regionFlag(section.region)} ${regionName(section.region, i18n.language)}`
+                : t('home.pewpew.route.otherRegion')
+              return [
+                <ListSubheader
+                  key={`region-${section.region ?? 'other'}`}
+                  sx={subheaderSx}
                 >
-                  <Typography noWrap sx={{ minWidth: 0, flex: 1 }}>
-                    {proxy.name}
-                  </Typography>
-                  {delay && (
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label={delay.label}
-                      color={delay.color}
-                      sx={delayChipSx}
-                    />
-                  )}
-                </MenuItem>
-              )
+                  <span>{label}</span>
+                  <span>{section.options.length}</span>
+                </ListSubheader>,
+                ...items,
+              ]
             })}
           </Select>
         </FormControl>

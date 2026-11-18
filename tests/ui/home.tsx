@@ -17,6 +17,8 @@ localStorage.setItem(
   'pewpew-auto-update-routes-on-startup',
   params.has('autoUpdate') ? 'true' : 'false',
 )
+if (params.has('noAutoSwitch'))
+  localStorage.setItem('pewpew-auto-switch-route', 'false')
 
 const connected = ['connected', 'enhanced', 'failedEnhanced'].includes(scenario)
 const enhanced =
@@ -69,6 +71,9 @@ const proxy = (name: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
+// Fixture latency per route; 0 marks a route whose last test timed out.
+const ROUTE_DELAYS = [86, 142, 63, 230, 0, 410, 95, 180]
+
 const records: Record<string, any> = {}
 function populateRoutes() {
   records.DIRECT = proxy('DIRECT', { type: 'Direct' })
@@ -81,7 +86,7 @@ function populateRoutes() {
       history: [
         {
           time: new Date().toISOString(),
-          delay: [86, 142, 63, 230, 0, 410, 95, 180][index % 8],
+          delay: ROUTE_DELAYS[index % 8],
         },
       ],
     })
@@ -368,9 +373,36 @@ mockIPC(
         return { rules: [] }
       case 'plugin:mihomo|get_rule_providers':
         return { providers: {} }
-      case 'plugin:mihomo|delay_proxy_by_name':
+      case 'plugin:mihomo|delay_proxy_by_name': {
+        // deadRoutes lists routes that stop answering (mihomo reports 0).
+        const dead = (params.get('deadRoutes') || '').split(',')
+        if (dead.includes(args.proxyName)) return { delay: 0 }
         await new Promise((r) => setTimeout(r, 300))
+        // Routes keep their fixture latency, so sorting is predictable.
+        const index = routeNames.indexOf(args.proxyName)
+        const fixed = index >= 0 ? ROUTE_DELAYS[index % 8] : 0
+        if (index >= 0) return { delay: fixed || 999 }
         return { delay: 60 + Math.round(Math.random() * 200) }
+      }
+      case 'test_delay': {
+        // Website timings through the local proxy; 10000 means it failed.
+        await new Promise((r) => setTimeout(r, 200))
+        const domestic = args.url.includes('baidu')
+        // globalDomesticMs: sites in China are slow only in Global mode.
+        if (
+          domestic &&
+          params.get('globalDomesticMs') &&
+          state.config.mode === 'global'
+        )
+          return Number(params.get('globalDomesticMs'))
+        return Number(
+          params.get(domestic ? 'domesticMs' : 'foreignMs') ||
+            (domestic ? 120 : 640),
+        )
+      }
+      case 'plugin:http|fetch':
+        // The exit location lookup has no network in tests.
+        throw new Error('offline')
       case 'plugin:mihomo|select_node_for_group': {
         if (params.get('selectionDelay')) {
           await new Promise((r) =>

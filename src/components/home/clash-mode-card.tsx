@@ -7,30 +7,22 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material'
-import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
 import {
   sectionLabelSx,
   segmentedControlSx,
   toneTextColor,
 } from '@/components/home/pewpew-ui'
-import { useRouteGuard } from '@/hooks/use-route-guard'
-import { useVerge } from '@/hooks/use-verge'
 import {
-  useAppRefreshers,
-  useClashConfigData,
-  useProxiesData,
-} from '@/providers/app-data-context'
-import { patchClashMode } from '@/services/cmds'
-import { showNotice } from '@/services/notice-service'
-import { resolvePewPewProxyGroup } from '@/utils/pewpew-client'
+  useClashModeChange,
+  type VisibleClashMode,
+} from '@/hooks/use-clash-mode-change'
+import { useClashConfigData } from '@/providers/app-data-context'
 
 const CLASH_MODES = ['rule', 'global', 'direct'] as const
 type ClashMode = (typeof CLASH_MODES)[number]
-const VISIBLE_CLASH_MODES = ['rule', 'global'] as const
-type VisibleClashMode = (typeof VISIBLE_CLASH_MODES)[number]
+const VISIBLE_CLASH_MODES: readonly VisibleClashMode[] = ['rule', 'global']
 
 const isClashMode = (mode: string): mode is ClashMode =>
   (CLASH_MODES as readonly string[]).includes(mode)
@@ -55,37 +47,12 @@ interface ClashModeCardProps {
 
 export const ClashModeCard = ({ disabled = false }: ClashModeCardProps) => {
   const { t } = useTranslation()
-  const { verge } = useVerge()
   const { clashConfig } = useClashConfigData()
-  const { proxies } = useProxiesData()
-  const { refreshClashConfig } = useAppRefreshers()
-  const { ensureValidRoute } = useRouteGuard()
   const {
     mutateAsync: onChangeMode,
     isPending,
     variables,
-  } = useMutation({
-    mutationKey: ['pewpewRoutes', 'mode'],
-    mutationFn: async (mode: VisibleClashMode) => {
-      const preferred = resolvePewPewProxyGroup(
-        proxies,
-        clashConfig?.mode,
-      ).currentName
-      try {
-        // Prepare the target group before making it carry live traffic.
-        if (!(await ensureValidRoute({ mode, preferred }))) return
-        await patchClashMode(mode)
-        if (verge?.auto_close_connection) {
-          await closeAllConnections().catch(() => {})
-        }
-      } catch (error) {
-        console.error('Failed to change mode:', error)
-        showNotice.error(t('home.pewpew.connection.modeChangeFailed'))
-      } finally {
-        await refreshClashConfig().catch(() => {})
-      }
-    },
-  })
+  } = useClashModeChange()
   const pendingMode = isPending ? variables : null
 
   // 直接使用API返回的模式，不维护本地状态
